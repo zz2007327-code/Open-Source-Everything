@@ -1,0 +1,6 @@
+# 统一换行，避免 Windows 检出的 CRLF 影响 shell 脚本执行
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.docx binary

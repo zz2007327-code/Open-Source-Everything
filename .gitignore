@@ -1,0 +1,29 @@
+# 运行时中间产物 / 证据目录
+work/
+evidence/
+stage1/
+stage2/
+stage3/
+pipeline-state.yaml
+
+# 探针输出
+*.png
+*.json
+!package.json
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / 编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
