@@ -20,11 +20,21 @@
 ## 🌐 English
 
 <!--
-GitHub repository metadata (About field, max 350 chars) — paste into the repo's About box:
+GitHub repository metadata — paste into the repo's About box.
 
+Note on length: GitHub counts characters, and a Chinese character counts as 1.
+The versions below are 273 / 173 / 203 chars respectively — all well under the 350 limit.
+
+About (bilingual, 273 chars):
 Reverse-engineer runnable targets (websites, SPAs, browser apps, mini programs, Electron, binaries) into evidence-backed mechanism notes, then distill them into build-ready functional specs. / 把网站、SPA、浏览器应用、子应用、小程序、Electron、二进制等可运行目标逆向拆解成有证据支撑的机制说明，再蒸馏成可直接施工的功能文档并交付 .docx。
 
-Repo topics:
+About (bilingual, shorter — easier to copy on mobile, 173 chars):
+Reverse-engineer runnable targets into evidence-backed mechanism notes, then distill them into build-ready functional specs. / 把可运行目标逆向拆解成有证据支撑的机制说明，再蒸馏成可直接施工的功能文档并交付 .docx。
+
+About (English only, 203 chars):
+Reverse-engineer websites/SPAs/mini programs/Electron/binaries into evidence-backed mechanism notes, then distill them into build-ready functional specs. Default deliverable is a doc (.docx), not a demo.
+
+Repo topics (add one at a time):
 reverse-engineering, teardown, clean-room, functional-spec, ai-skill, browser-automation, cdp, docx, specification, sandbox-analysis
 -->
 
