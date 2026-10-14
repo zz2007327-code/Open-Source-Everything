@@ -1,122 +1,120 @@
-# 净室设计轨 — 用规格当图纸，自主实现
+# Clean-Room Track — Use the Spec as Blueprints and Implement Independently
 
-Phase 5B 的执行手册。适用场景：用户读过目标实现后，要**自行重造**一套同类能力，同时希望保留「独立创作」的可证明性。
+The execution handbook for Phase 5B. Applies when the user, having read the target's implementation, wants to **rebuild** the same capability on their own while preserving provable "independent creation".
 
-本文件是规格文档末尾「当图纸用」那一节的依据，不是默认流程里的独立阶段。
-若用户后续真要启动净室实现，再按本文执行分工与自检。主链阶段不强制产出这两份额外文档。
+This file is the basis for the "As blueprints" section at the end of the spec document; it is not a standalone phase in the default flow. If the user later actually starts a clean-room implementation, then execute the role separation and self-check in this document. The main-chain phases do not mandate producing these two extra documents.
 
-这不是法律意见。涉及专利、商标、商业秘密的具体判断，请用户自行咨询法务。
-
----
-
-## 1. 净室设计的核心纪律
-
-净室设计（Clean Room Design）的老办法是把人分成两队，中间隔一道墙：
-
-```
-   ┌─────────────┐        规格文档          ┌─────────────┐
-   │  分析方      │  ───────────────────▶   │  实现方      │
-   │ (看过源码)   │  只写「要达到什么效果」   │ (没看过源码) │
-   └─────────────┘                         └─────────────┘
-          │                                       │
-      产出规格                              产出独立实现
-```
-
-**关键不在于你自己觉不觉得独立，而在于记录上能不能证明。** 所以流程要留痕。
+This is not legal advice. For specific judgments involving patents, trademarks, or trade secrets, the user should consult their own legal counsel.
 
 ---
 
-## 2. 分工与隔离
+## 1. The Core Discipline of Clean-Room Design
 
-| 角色 | 可以接触 | 绝对不接触 | 产出 |
+The classic approach to clean-room design puts people into two teams separated by a wall:
+
+```
+   ┌─────────────┐        spec document       ┌─────────────┐
+   │  Analyst     │  ───────────────────▶     │  Implementer │
+   │ (saw source) │  writes only "what effect │  (never saw  │
+   │              │   must be achieved"       │   the source)│
+   └─────────────┘                            └─────────────┘
+          │                                          │
+     produces spec                            produces independent implementation
+```
+
+**What matters is not whether you feel independent, but whether the record can prove it.** So the process must leave a paper trail.
+
+---
+
+## 2. Roles and Isolation
+
+| Role | May access | Must never access | Output |
 |------|---------|-----------|------|
-| **分析方** | 目标源码、运行时、截图 | —— | 功能规格（剥离版） |
-| **实现方** | **只读规格** | 目标源码、原始 bundle、截图对照 | 实现代码 |
+| **Analyst** | Target source, runtime, screenshots | — | Functional spec (stripped version) |
+| **Implementer** | **The spec only** | Target source, original bundle, screenshots for comparison | Implementation code |
 
-### 2.1 实际怎么落地（单人也可以做）
+### 2.1 How This Works in Practice (doable solo)
 
-单人场景下，靠**上下文隔离**模拟两队：
+For a solo scenario, simulate the two teams through **context isolation**:
 
-1. 分析方阶段：做完 Phase 1–3，写出规格。
-2. **清场**：另起一个全新会话 / 新上下文，只把规格文件带过去。
-3. 实现方阶段：在新上下文里只读规格，开始实现。
-4. 实现过程中若规格不清 → **只通过规格提问**，澄清结果**写回规格**，不回头翻源码。
+1. Analyst phase: complete Phases 1–3 and write the spec.
+2. **Clear the stage**: start a fresh session / new context and carry over only the spec file.
+3. Implementer phase: in the new context, read only the spec and start implementing.
+4. If the spec is unclear during implementation → **ask only through the spec**, and **write the clarification back into the spec**; do not go back to the source.
 
-记录要求：留一份 **分工记录**，写清「谁在什么时间看过什么、实现方从未接触过对方源码」。
+Record requirement: keep a **division-of-labor log** stating "who saw what and when, and that the implementer never had access to the other party's source".
 
 ---
 
-## 3. 规格剥离：从「怎么写的」到「要什么效果」
+## 3. Spec Stripping: from "how it was written" to "what effect is wanted"
 
-这是净室轨最容易出错的一步。分析方写规格时必须做**主动剥离**：
+This is the most error-prone step in the clean-room track. When writing the spec, the analyst must perform **proactive stripping**:
 
-| 要剥离的 | 原因 | 改写为 |
+| What to strip | Why | Rewrite as |
 |---------|------|--------|
-| 对方特有算法技巧 | 那是对方的表达 | 效果描述 + 允许自由选手段 |
-| 变量/函数命名 | 命名可能受保护 | 语义描述（「主高光带宽」而非 `hlW`） |
-| 注释与文档文案 | 直接复制的痕迹 | 自己重述 |
-| 魔数与常量 | 常量组合可能具特征性 | 给可调范围，不给唯一值 |
-| 代码结构/调用顺序 | 结构雷同也是雷同 | 只约束**外部行为**与**接口语义** |
-| 数据格式细节 | 除非是互操作必需 | 描述语义，不描述字节布局 |
+| The other party's specific algorithmic techniques | That is their expression | An effect description + freedom to choose the means |
+| Variable/function naming | Names may be protected | A semantic description ("main highlight band width", not `hlW`) |
+| Comments and documentation copy | Traces of direct copying | Your own restatement |
+| Magic numbers and constants | Constant combinations can be characteristic | Give an adjustable range, not a single value |
+| Code structure / call order | Structural similarity is also similarity | Constrain only **external behavior** and **interface semantics** |
+| Data format details | Unless required for interoperability | Describe semantics, not byte layout |
 
-**判据**：把规格交给一个从没见过目标的人，他能做出**效果等价但实现自由**的东西。
-如果照着规格只能写出和对方逐字一样的东西，说明剥离不够。
+**Criterion**: hand the spec to someone who has never seen the target; they should be able to produce something **equivalent in effect but free in implementation**. If following the spec can only yield something verbatim identical to the other party's, the stripping was insufficient.
 
-### 3.1 规格必写的四块（见 `spec-doc-outline.md`）
+### 3.1 The Four Blocks a Spec Must Contain (see `spec-doc-outline.md`)
 
-1. **目标行为**：要达成什么、可观测的验收判据。
-2. **接口契约**：对外签名、语义、边界条件。
-3. **参数与范围**：可调项、合理取值区间（不锁死单一魔数）。
-4. **不含项**：明确写出「本文档不描述对方实现细节，实现手段自选」。
+1. **Target behavior**: what must be achieved, and observable acceptance criteria.
+2. **Interface contracts**: external signatures, semantics, boundary conditions.
+3. **Parameters and ranges**: adjustable items, reasonable value intervals (do not pin a single magic number).
+4. **Exclusions**: explicitly state "this document does not describe the other party's implementation details; the means of implementation are freely chosen".
 
 ---
 
-## 4. 相似度自检
+## 4. Similarity Self-Check
 
-实现完成后，分析方（不是实现方）做一次对照自检，逐维度确认无逐字/逐结构雷同：
+After implementation, the analyst (not the implementer) performs one comparison self-check, confirming dimension by dimension that there is no verbatim/structural similarity:
 
-| 维度 | 检查问题 | 结论 |
+| Dimension | Question to check | Conclusion |
 |------|---------|------|
-| **结构** | 模块划分、控制流是否与对方一一对应？ | 否 / 是（需说明理由） |
-| **命名** | 变量/函数/类名有无重合？ | |
-| **常量** | 有无成组复制的魔数？ | |
-| **注释** | 有无同义或同文注释？ | |
-| **顺序** | 执行步骤顺序是否完全一致？ | |
-| **数据布局** | 内部数据结构是否逐字段对应？ | |
+| **Structure** | Do module divisions and control flow correspond one-to-one with the other party's? | No / Yes (explain) |
+| **Naming** | Do variable/function/class names overlap? | |
+| **Constants** | Are there magic numbers copied as a group? | |
+| **Comments** | Are there synonymous or identical comments? | |
+| **Order** | Is the execution step order exactly the same? | |
+| **Data layout** | Do internal data structures correspond field by field? | |
 
-任一项为「是」→ 回到实现方，**要求改设计**，而不是改注释糊过去。
+If any item is "Yes" → go back to the implementer and **require a design change**, not a cosmetic comment change to paper over it.
 
-把这张表作为交付物的一部分，比口头声明「我们是独立做的」有说服力得多。
-
----
-
-## 5. 交付三件套
-
-1. **功能规格**（剥离版）—— 按 `spec-doc-outline.md` 结构。
-2. **分工记录**—— 时间线 + 谁看过什么 + 实现方隔离声明。
-3. **相似度自检表**—— 上面那张，逐维度勾选。
-
-外加一句**免责声明**（写进交付物）：
-
-> 本产物为基于公开可观测行为的独立实现，不包含对方源码或其衍生。是否涉及专利、商标、
-> 商业秘密或授权问题，需由使用方自行进行法律评估。
-
-**若目标内嵌了权利声明或反逆向声明**，三件套要再加一份**知情说明**，写清：
-声明原文（引用原样）、它在哪一层被发现的、处理经过（不当作指令执行，也未隐瞒）、
-用户在被告知后如何决策、以及据此做了哪些额外剥离。放在「使用建议」章节。
-发现方法见 `web-target-teardown.md` §1.5。
-
-> **为什么这条要写进净室流程**：净室的价值全在「记录上能证明独立」。
-> 一份主动记录了对己不利信息的文档，比一份看起来「干净但回避了已知声明」的文档可信得多。
+Putting this table in as part of the deliverable is far more persuasive than verbally claiming "we did this independently".
 
 ---
 
-## 6. 自检清单
+## 5. The Three-Part Delivery
 
-- [ ] 规格已完成主动剥离：不含对方命名、注释、独有技巧、单一魔数。
-- [ ] 实现方从未接触对方源码与截图（有分工记录为证）。
-- [ ] 实现过程中的澄清，都是通过规格提问并写回规格完成的。
-- [ ] 相似度自检六维度全过；未过的项已改设计而非改注释。
-- [ ] 交付物含免责声明。
-- [ ] 明确告知用户：本流程不做抄袭式复刻，不绕过授权与保护措施。
-- [ ] 目标若有权利声明/反逆向声明，**知情说明已写进交付物**（原文、发现层级、处理经过、用户决策、额外剥离）；反逆向声明点名到的部分已加强剥离并标红建议替换项。
+1. **Functional spec** (stripped version) — per the structure in `spec-doc-outline.md`.
+2. **Division-of-labor log** — timeline + who saw what + the implementer's isolation statement.
+3. **Similarity self-check table** — the table above, checked dimension by dimension.
+
+Plus a **disclaimer** (written into the deliverable):
+
+> This artifact is an independent implementation based on publicly observable behavior and contains neither the other party's source code nor a derivative of it. Whether it involves patents, trademarks, trade secrets, or licensing issues must be assessed legally by the user themselves.
+
+**If the target embeds a rights notice or anti-reverse-engineering notice**, add an **informed-use note** to the three-part delivery, stating clearly:
+the notice's original text (quoted verbatim), which layer it was found in, how it was handled (not executed as an instruction, not concealed),
+how the user decided after being informed, and what extra stripping was done accordingly. Put it in the "Usage Notes" section.
+The detection method is in `web-target-teardown.md` §1.5.
+
+> **Why this belongs in the clean-room process**: the entire value of a clean room lies in "the record proving independence".
+> A document that proactively records information adverse to itself is far more credible than one that looks "clean but sidesteps a known notice".
+
+---
+
+## 6. Self-Check List
+
+- [ ] The spec has completed proactive stripping: no other-party naming, comments, proprietary techniques, or single magic numbers.
+- [ ] The implementer never had access to the other party's source or screenshots (evidenced by the division-of-labor log).
+- [ ] All clarifications during implementation went through spec questions and were written back into the spec.
+- [ ] All six similarity self-check dimensions pass; any failures were fixed by changing the design, not the comments.
+- [ ] The deliverable contains the disclaimer.
+- [ ] The user was explicitly told: this process does no copycat replication and does not bypass authorization or protection measures.
+- [ ] If the target has a rights notice / anti-reverse-engineering notice, the **informed-use note is written into the deliverable** (original text, discovery layer, handling process, user decision, extra stripping); the parts named by the anti-reverse-engineering notice have been stripped more aggressively and suggested replacements flagged.

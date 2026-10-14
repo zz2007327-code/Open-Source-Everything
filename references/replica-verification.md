@@ -1,228 +1,221 @@
-# Phase 2 门禁执行标准：决定性环节验证
+# Phase 2 Gate Execution Standard: Critical-Link Verification
 
-Phase 2 的准入规则是「**决定性环节没验证就不准写规格**」。
+Phase 2's admission rule is "**no spec may be written before the decisive links are verified**".
 
-本文件是 Phase 2 的执行标准。门禁的形态是：
-**只验证 1–3 个决定性环节，不产任何可运行页面。**
-复刻件时代的执行细则保留在文末附录，仅当 SKILL.md 的「追加复刻段」条件成立时才读。
-
----
-
-## 0. 两条前置纪律
-
-这两条比任何验证清单都值钱——违反它们会导致整模块返工。
-
-### 0.1 机制原文前置：没读到承载效果的源函数之前，不许把它的行为写进规格
-
-对任何一个要进规格的**视觉/行为机制**，动笔前必须先在源码里定位承载它的函数并读完。
-
-判定方法很简单，动笔前自问一句：
-
-> **这个效果的源函数叫什么？在哪一行？**
-
-答不上来，就是还没读够，不要写进规格。
-
-已读到真相后再写，和凭观感猜着写，差别是**整个模块**：
-
-- 反面实例（真实）：把「花边」按观感理解为**矢量描边**，自绘了一套彩色锯齿路径；
-  读完原文才发现真实机制是**预渲染装饰瓦片 + `drawImage` 平铺**，外加一条逐针缝出的边线。
-  → 整个花边渲染函数推倒重写，规格里对应章节也全部作废。
-- 近似写进规格最贵的地方在于：**它会变成后续所有对比的基准**。
-  一旦观感「差不多」，你就失去了发现机制不同的动力，直到下游实现接歪才暴露。
-
-### 0.2 数值零臆造：每个常数只有两个合法来源
-
-规格里的每个魔数，来源只能是：
-
-1. **原文常量**（直接抄它的值）；或
-2. **原文表达式**（照抄式子，代入同一组输入）。
-
-不允许「手搓个差不多的」——近似值会让规格「像但不对」，而这种偏差在实现阶段极难归因。
-
-- 反面实例（真实）：逐字随机参数写成 `.95+rnd()*.14`（原文是 `.84+rnd()*.32`）；
-  字宽用 `adv * size`（原文是**常量 `1.04em`**）；漏掉逐字 `turn` 旋转与逐行 `lineWobble`。
-  → 铺排规格整体重写。
-
-> 自查动作：把规格里的魔数**挨个 grep 回原文**。对不上的，就是臆造。
+This file is Phase 2's execution standard. The gate takes this form:
+**verify only 1–3 decisive links, and produce no runnable page.**
+Execution details from the replica era are kept in the appendix at the end, read only when the "add a replica segment" conditions in SKILL.md hold.
 
 ---
 
-## 1. 圈定决定性环节
+## 0. Two Prerequisite Disciplines
 
-**决定性环节 = 一旦理解错，整份规格就会写歪的地方。**
+These two are worth more than any verification checklist — violating them causes an entire module to be reworked.
 
-不是所有环节都值得深验。先花几分钟圈定，一般只有 **1–3 个**。
+### 0.1 Mechanism source text first: do not write an effect's behavior into the spec before reading the source function that carries it
 
-### 1.1 判定标准
+For any **visual/behavioral mechanism** that will enter the spec, you must locate and read the function that carries it in the source before writing.
 
-某环节是决定性的，当且仅当满足任一条：
+The test is simple — ask yourself one question before writing:
 
-| 判据 | 例子 |
+> **What is the source function for this effect, and which line is it on?**
+
+If you cannot answer, you have not read enough; do not put it in the spec.
+
+Writing after reaching the truth versus guessing from appearance differs by **an entire module**:
+
+- Counter-example (real): a "lace border" was understood from appearance as **vector stroking**, and a set of colored jagged paths was hand-drawn; only after reading the source did the real mechanism turn out to be **pre-rendered decorative tiles + `drawImage` tiling**, plus a stitch-by-stitch border line. → The entire lace rendering function was rewritten from scratch and the corresponding spec section voided.
+- The most expensive thing about putting an approximation into a spec is that **it becomes the baseline for every subsequent comparison**. Once the look is "about right", you lose the motivation to discover that the mechanism differs, until a downstream implementation finally goes wrong.
+
+### 0.2 Zero invented numbers: every constant has only two legitimate sources
+
+Every magic number in the spec may come only from:
+
+1. A **source constant** (copy its value directly); or
+2. A **source expression** (copy the formula, substitute the same inputs).
+
+"There, I improvised something close enough" is not allowed — an approximation makes the spec "similar but not correct", and such deviations are extremely hard to attribute during implementation.
+
+- Counter-example (real): per-glyph random parameters were written as `.95+rnd()*.14` (the source has `.84+rnd()*.32`); glyph width used `adv * size` (the source uses the **constant `1.04em`**); per-glyph `turn` rotation and per-line `lineWobble` were omitted. → The entire layout spec was rewritten.
+
+> Self-check action: **grep each magic number in the spec back to the source**. Any that do not match is invented.
+
+---
+
+## 1. Narrow Down the Decisive Links
+
+**A decisive link = a place where, if misunderstood, the whole spec goes crooked.**
+
+Not every link deserves deep verification. Spend a few minutes narrowing them down; typically there are only **1–3**.
+
+### 1.1 Criteria
+
+A link is decisive if and only if it satisfies any one of:
+
+| Criterion | Example |
 |------|------|
-| 它产出了全链路共享的**数据结构** | 布局网格、几何点位表、中间态对象 |
-| 它的机制**反直觉**，按观感猜几乎必错 | 「花边」实为瓦片平铺而非描边 |
-| 它决定**性能或内存量级** | 每帧是否重算、是否离屏缓存 |
-| 它是**交互/时序的源头** | 事件 → 状态机 → 触发的更新链 |
-| 它决定了**最显眼的那部分视觉** | 主渲染函数、合成模式 |
+| It produces a **data structure** shared across the whole chain | A layout grid, a geometry point table, an intermediate-state object |
+| Its mechanism is **counter-intuitive** and near-certain to be guessed wrong from appearance | A "lace border" is actually tile tiling, not stroking |
+| It determines the **performance or memory magnitude** | Whether something is recomputed every frame, whether it is cached offscreen |
+| It is the **source of interaction/timing** | Event → state machine → the update chain it triggers |
+| It determines the **most visually prominent part** | The main render function, the composite mode |
 
-### 1.2 收敛纪律
+### 1.2 Convergence Discipline
 
-- 圈出 **超过 3 个** → 说明没收敛，回 Phase 1 重读源码，而不是逐个硬验。
-- 圈不出决定性环节 → 说明目标机制简单，Phase 2 用 §2 的「原文引证」单条路径即可，不要硬造工作量。
-- 用户已明确指向某模块 → 那个模块就是决定性环节，其余不验。
+- More than **3** narrowed down → you have not converged; go back to Phase 1 and reread the source rather than verifying each one doggedly.
+- Cannot narrow down any decisive link → the target's mechanism is simple; Phase 2 can use the single "source citation" path in §2. Do not manufacture busywork.
+- The user already pointed at a specific module → that module is the decisive link; verify nothing else.
 
 ---
 
-## 2. 三条验证路径（按成本从低到高）
+## 2. Three Verification Paths (cheapest first)
 
-**默认走第1 条。走第 3 条必须先说清理由。**
+**Path 1 is the default. Taking Path 3 requires stating the reason first.**
 
-### 路径 1 — 原文引证（最省，默认）
+### Path 1 — Source Citation (cheapest, default)
 
-不写任何代码，只做三件事：
+Write no code at all; do only three things:
 
-1. 定位并抄录承载该机制的源码片段（含文件与行号）。
-2. 逐行标注这段代码如何产生所声称的行为。
-3. 把所有出现的常量整理成表：`常量名 / 值 / 出处行号 / 作用`。
+1. Locate and transcribe the source snippet that carries the mechanism (with file and line numbers).
+2. Annotate line by line how that code produces the claimed behavior.
+3. Collect every constant that appears into a table: `constant name / value / source line / role`.
 
-产出物形态（直接进 Phase 3）：
+Deliverable shape (goes straight into Phase 3):
 
-| 机制 | 承载函数（文件:行） | 关键片段 | 常量表 | 结论强度 |
+| Mechanism | Carrying function (file:line) | Key snippet | Constant table | Conclusion strength |
 |------|--------------------|---------|--------|---------|
-| 主渲染合成 | bundle.js:8821–8890 | 3–5 行摘录 | overlay alpha 0.92 / blur 12 | 原文确定 |
+| Main render compositing | bundle.js:8821–8890 | 3–5 line excerpt | overlay alpha 0.92 / blur 12 | Source-confirmed |
 
-**为什么这条够用**：规格的作用是让人实现，不是让人验收渲染结果。
-原文引证足以支撑「怎么做」，且**没有返工风险**——因为没有你写错的中间实现。
+**Why this path suffices**: a spec's job is to let someone implement, not to let someone accept rendered output. Source citation is enough to support "how to do it", and it carries **no rework risk** — because there is no intermediate implementation for you to get wrong.
 
-### 路径 2 — 数值对照
+### Path 2 — Numeric Cross-Check
 
-把原文表达式代入具体输入，在表格里列出「输入 → 输出」，验证量级合理。
+Substitute the source expression with concrete inputs and list "input → output" in a table to confirm the magnitude is sane.
 
-- 好：`w = 1000px` → `振幅 = w*0.34 = 340px`；`缠绕周期 = w*3.2 = 3200px`
-- 目的：抓**单位错误**与**量级错误**（把 em 当 px、把角度当弧度、把比例当绝对值）。
-- 顺手把探针实测值填在同一张表里做对照：
+- Good: `w = 1000px` → `amplitude = w*0.34 = 340px`; `wrap period = w*3.2 = 3200px`
+- Purpose: catch **unit errors** and **magnitude errors** (treating em as px, degrees as radians, a ratio as an absolute value).
+- Conveniently fill the probe's measured values into the same table for comparison:
 
-| 量 | 规格值（按原文表达式算） | 运行态实测（探针注入读取） | 是否一致 |
+| Quantity | Spec value (computed from the source expression) | Runtime measured (read via probe injection) | Consistent? |
 |----|------------------------|--------------------------|---------|
-| 元素总数 | 340 | 341 | 差 1（可能末位舍入，已解释） |
-| 画布尺寸 | 1000×600 | 1000×600 | 一致 |
+| Total elements | 340 | 341 | Off by 1 (possible last-digit rounding, explained) |
+| Canvas size | 1000×600 | 1000×600 | Consistent |
 
-> 实测值取自 `scripts/cdp_probe.js` 的 `EVAL=`，直接对**真实目标**注入取值即可，不需要复刻件。
+> Measured values come from `scripts/cdp_probe.js` `EVAL=`, injected directly into the **real target** — no replica needed.
 
-### 路径 3 — 最小复现（最后手段）
+### Path 3 — Minimal Reproduction (last resort)
 
-**只在路径 1、2 都判不准时使用。** 形态要求：
+**Use only when paths 1 and 2 cannot decide.** Shape requirements:
 
-- **只覆盖这一个环节**，不复刻全链路；
-- 可以是几行 node / 一段 canvas 代码 / 一次 `EVAL=` 注入，**不必是自包含 HTML 页面**；
-- 不要求挂 `__dbg()` / `__tick()`，除非用户要拿它当教学材料；
-- 目的是回答一个具体问题（如「这个 blend 模式实际输出是什么颜色」），不是「证明我能跑出等价效果」。
+- **Cover only this one link**, never the full chain;
+- May be a few lines of node / a canvas snippet / a single `EVAL=` injection, **not necessarily a self-contained HTML page**;
+- No requirement to attach `__dbg()` / `__tick()` unless the user wants it as teaching material;
+- The purpose is to answer a specific question (e.g. "what color does this blend mode actually output"), not "prove I can reproduce an equivalent effect".
 
-用完即弃的东西不要落盘成大文件；确需留存就只留片段 + 结论。
-
----
-
-## 3. 门禁通过判据
-
-进入 Phase 3 之前，逐条核对：
-
-- [ ] 已明确列出本次的**决定性环节**（1–3 个），并说明为何是它们。
-- [ ] 每个决定性环节都能指到**源码位置**（文件:行）或**一条实测数据**或**一张标注过的截图**。
-- [ ] 进入规格的每个魔数都**grep 回过原文**。
-- [ ] 规格里任何「不知道」的表述都进了「未知与未验证项」，没有出现在正文当结论。
-- [ ] 环境能力不足导致的验证空白，已如实标注为**取证缺口**并说明了依据。
-
-> **一条硬判据**：规格正文里如果有一句话，既指不到源码/数据/截图，又没进未知项——就是没验过的猜测，回去验。
+Do not let throwaway work land on disk as a large file; if it must be kept, keep only the snippet + conclusion.
 
 ---
 
-## 4. 取证缺口的写法
+## 3. Gate Pass Criteria
 
-环境能力不足（无 WebGL、目标需真实设备、需要登录态等）导致无法验证时：
+Before entering Phase 3, check item by item:
 
-- 在规格里如实标注「**本环境无法验证 X，原因是 Y**」；
-- 说明结论依据的是**源码结构**而非运行画面；
-- 把它写进「风险与待定项」章节。
+- [ ] The **decisive links** for this task (1–3) are explicitly listed, with a rationale for each.
+- [ ] Every decisive link points to a **source location** (file:line), a **piece of measured data**, or an **annotated screenshot**.
+- [ ] Every magic number entering the spec has been **grepped back to the source**.
+- [ ] Any "I don't know" statement in the spec went into "Unknowns and Unverified Items" rather than appearing in the body as a conclusion.
+- [ ] Verification gaps caused by insufficient environment capability are honestly marked as **evidence gaps** with the basis stated.
 
-> **缺口本身不是问题，伪造证据才是。**
+> **One hard criterion**: if a sentence in the spec body points to no source/data/screenshot and did not go into the unknowns section, it is an unverified guess — go back and verify it.
 
 ---
 
-## 5. 取证环境的两个硬事实
+## 4. How to Write an Evidence Gap
 
-| 事实 | 影响 | 应对 |
+When insufficient environment capability (no WebGL, target requires real hardware, requires a logged-in state, etc.) prevents verification:
+
+- Mark it honestly in the spec: "**This environment cannot verify X, because Y**";
+- State that the conclusion rests on **source structure** rather than rendered output;
+- Write it into the "Risks and Open Items" section.
+
+> **A gap is not the problem; fabricated evidence is.**
+
+---
+
+## 5. Two Hard Facts About the Evidence Environment
+
+| Fact | Impact | Action |
 |------|------|------|
-| 无头 Chromium **默认没有 WebGL**（`getContext('webgl2'\|'webgl')` 返回 `false`） | 依赖 WebGL 的目标（Three.js 等）**渲染效果无法直接观察** | 用探针的 `SOFTWEBGL=1`（`--enable-unsafe-swiftshader --use-angle=swiftshader`）。**实测可拿到 `WebGL 2.0`**。仍不行就按 §4 记为取证缺口 |
-| `file://` 页面上 **rAF 被节流**（远程页面正常） | 若走追加复刻段，本地页动画「假死」 | 用 `setInterval` 兜底 + `__tick()` 确定性步进（见附录 §A3） |
+| Headless Chromium has **no WebGL by default** (`getContext('webgl2'\|'webgl')` returns `false`) | Targets relying on WebGL (Three.js, etc.) have **rendered output that cannot be observed directly** | Use the probe's `SOFTWEBGL=1` (`--enable-unsafe-swiftshader --use-angle=swiftshader`). **This reliably yields `WebGL 2.0`**. If it still fails, record an evidence gap per §4 |
+| **rAF is throttled** on `file://` pages (remote pages are fine) | If you take the add-on replica segment, local-page animation "freezes" | Use a `setInterval` fallback + `__tick()` deterministic stepping (see appendix §A3) |
 
 ---
 
-## 6. 性能：先看错误，再看耗时
+## 6. Performance: Look at Errors First, Then Timing
 
-**帧耗时极高时，先怀疑每帧在抛异常，而不是算法慢。**
+**When frame time is extreme, suspect an exception thrown every frame before suspecting a slow algorithm.**
 
-判断性能问题时先做两件事：
+When investigating a performance problem, do two things first:
 
-1. 读异常（`env.exceptions` / `consoleErrors` / `bootErrs`，探针已输出三层视图）。
-   异常驱动的开销常比算法本身大一个数量级。
-2. 读耗时的同时确认时间花在**哪一级链路**，而不是猜。
+1. Read the exceptions (`env.exceptions` / `consoleErrors` / `bootErrs`; the probe already emits all three layers).
+   The overhead driven by exceptions is often an order of magnitude larger than the algorithm itself.
+2. While reading timings, confirm **which link level** the time goes to, rather than guessing.
 
-只有在无异常、耗时仍高时，才去谈算法层面的优化（缓存、降采样、离屏合成）。
+Only when there is no exception and the timing is still high should you discuss algorithmic optimization (caching, downsampling, offscreen compositing).
 
 ---
 
-# 附录 — 追加复刻段专用
+# Appendix — For Add-on Replica Segments Only
 
-> **仅当 SKILL.md 的「追加复刻段」三个条件之一成立时读本附录。**
-> 主链默认不走这里，**不要因为读到这些要求就去造页面**。
+> **Read this appendix only when one of the three "add a replica segment" conditions in SKILL.md holds.**
+> The main chain does not come here by default — **do not build a page just because you read these requirements**.
 
-## A1. 追加复刻段的形态要求
+## A1. Shape Requirements for an Add-on Replica Segment
 
-- 单文件、自包含、无外部依赖；
-- **只复刻决定性环节**，不复刻全链路；
-- 每一步尽量可视化为并排阶段（如「栅格化 → 骨架 → 折线 → 元素 → 成品」）；
-- 若用户明确要当教学材料，再挂自检探针。
+- Single-file, self-contained, no external dependencies;
+- **Reproduce only the decisive links**, never the full chain;
+- Visualize each step as side-by-side stages where possible (e.g. "rasterize → skeleton → polyline → elements → finished");
+- If the user explicitly wants it as teaching material, then attach self-check probes.
 
-## A2. 自检探针（仅交付给他人当教学材料时必须挂）
+## A2. Self-Check Probes (required only when delivering to others as teaching material)
 
-### `window.__dbg()` — 返回结构化状态
+### `window.__dbg()` — returns structured state
 
-| 字段 | 含义 | 为什么需要 |
+| Field | Meaning | Why it is needed |
 |------|------|-----------|
-| `bootErr` | 启动期抛错数组（`try{ boot() }catch`） | **最关键**。见 §A3 第 1 行 |
-| `errs` | 运行期错误数组 | 区分「没画」和「画了但报错」 |
-| `frames` | rAF 实际触发帧数 | 判定 rAF 是否被节流 |
-| `progress` / `done` | 进度 / 已完成计数 | 判定动画是否真的在推进 |
-| `stage` | 当前处理阶段 | 判定卡在哪一级链路 |
-| `midPx` 等 | 画面中心的像素采样 | 判定「有没有画到屏幕外」 |
-| `frameMs` | 单帧耗时 | 判定性能，也顺带暴露「每帧抛异常」 |
-| `dpr` / `zoom` / `ox` / `oy` | 视口与变换 | 排查坐标空间错位 |
+| `bootErr` | Array of boot-time throws (`try{ boot() }catch`) | **Most critical**. See §A3 row 1 |
+| `errs` | Array of runtime errors | Distinguishes "did not draw" from "drew but threw" |
+| `frames` | Actual rAF frame count | Determines whether rAF is throttled |
+| `progress` / `done` | Progress / completed count | Determines whether the animation is really advancing |
+| `stage` | Current processing stage | Determines which link level it is stuck at |
+| `midPx` etc. | Pixel sample at screen center | Determines "did it draw offscreen" |
+| `frameMs` | Per-frame time | Determines performance and incidentally exposes "an exception thrown every frame" |
+| `dpr` / `zoom` / `ox` / `oy` | Viewport and transform | Troubleshoots coordinate-space misalignment |
 
-### `window.__tick(n, dt)` — 确定性步进
+### `window.__tick(n, dt)` — deterministic stepping
 
-不依赖 rAF，手动推进 n 帧、每帧固定 dt。用途：无头环境下 rAF 不可靠时仍能跑完整链路；
-结果可复现，对比才可比。实现上把主循环抽成 `tick(dt)`，`loop(now)` 只做 `dt = clamp(...)` 再调 `tick(dt)`。
+Does not depend on rAF; manually advances n frames, each with a fixed dt. Use: run the full chain even when rAF is unreliable in a headless environment; results are reproducible, so comparisons are comparable. Implementation-wise, factor the main loop into `tick(dt)`; `loop(now)` only does `dt = clamp(...)` and then calls `tick(dt)`.
 
-配套**rAF 兜底定时器**：`setInterval(() => { if (now - lastRafAt > 250) tick(...); }, 1000/60)`。
+Pair it with an **rAF fallback timer**: `setInterval(() => { if (now - lastRafAt > 250) tick(...); }, 1000/60)`.
 
-## A3. 复刻常见 bug 表
+## A3. Common Replica Bug Table
 
-按「症状 → 根因 → 处置」记。**症状往往是错的，根因往往不在你以为的地方。**
+Recorded as "symptom → root cause → action". **The symptom is often wrong, and the root cause is often not where you think it is.**
 
-| # | 症状 | 根因 | 处置 |
+| # | Symptom | Root cause | Action |
 |---|------|------|------|
-| 1 | `errs` 为空但页面明显崩了；探针也报无错 | 错误发生在**脚本初始化阶段**，而错误钩子是页面加载后才注入的 | ① 页面内自建 `window.__bootErr`；② 探针改用 `Page.addScriptToEvaluateOnNewDocument`（本 skill 探针已是 document-start 注入） |
-| 2 | 本地复刻件动画完全不动 | `file://` 页面上 rAF 被节流（远程页面正常） | 加 `setInterval` 兜底 + `__tick()` 确定性步进 |
-| 3 | 进度是负的、永远不出针 | 首帧 rAF 时间戳可能早于脚本加载时刻 → `dt` 为负 | `dt = clamp((t - lastMs)/1000, 0, 0.05)` |
-| 4 | 改了画布尺寸后画面变空白 | 改 canvas 尺寸会清空画布，而下一帧不一定到来 | `build()`/`resize` 末尾**直接调一次 `draw()`**，不要等 rAF |
-| 5 | 每帧耗时 500ms+，卡到无法调 | 不是算法慢，是**每帧在抛异常**：把 `rgba(...)` 颜色字符串当数字乘了系数 → `gradient.addColorStop('NaN')` | 立即看 `errs`。渐变/颜色一律传**数值分量** `(r,g,b,a)` |
-| 6 | `drawImage` 抛错 | 传入的是数组而不是 canvas | 逐个核对传入对象类型 |
-| 7 | 抛 `X is not defined` | 上一次模块重写留下的**旧函数残留调用点** | grep 旧函数名清干净 |
-| 8 | 布面整个跑到屏幕外（整屏一个色） | 忘了把「世界坐标」映射到「视口坐标」 | 显式引入 `originX/originY`，绘制前 `setTransform(DPR*z,0,0,DPR*z, DPR*ox, DPR*oy)` |
-| 9 | 文字压在装饰边上 | 排版用了未缩放的边距，而装饰用的是缩放后的值 | 两者读**同一个**已缩放量 |
-| 10 | 观感与目标差一点点，怎么调都不像 | 默认值/常量是臆造的（见 §0.2） | 把魔数挨个 grep 回原文 |
+| 1 | `errs` is empty but the page is clearly broken; the probe reports no error either | The error occurs **during script initialization**, while the error hook was injected after page load | ① Build `window.__bootErr` in the page; ② switch the probe to `Page.addScriptToEvaluateOnNewDocument` (this skill's probe already injects at document-start) |
+| 2 | A local replica's animation does not move at all | rAF is throttled on `file://` pages (remote pages are fine) | Add a `setInterval` fallback + `__tick()` deterministic stepping |
+| 3 | Progress is negative and it never renders | The first rAF timestamp can precede script load time → `dt` is negative | `dt = clamp((t - lastMs)/1000, 0, 0.05)` |
+| 4 | The screen goes blank after changing the canvas size | Changing canvas dimensions clears the canvas, and the next frame may not arrive | Call `draw()` **directly** at the end of `build()`/`resize` instead of waiting for rAF |
+| 5 | Per-frame time is 500ms+, too laggy to debug | Not a slow algorithm — **an exception thrown every frame**: an `rgba(...)` color string was multiplied by a coefficient → `gradient.addColorStop('NaN')` | Look at `errs` immediately. Always pass **numeric components** `(r,g,b,a)` for gradients/colors |
+| 6 | `drawImage` throws | An array was passed instead of a canvas | Check each passed object's type |
+| 7 | Throws `X is not defined` | A **leftover call site** from a previous module rewrite | Grep the old function name and clean it out |
+| 8 | The whole fabric runs offscreen (one solid color fill) | Forgot to map "world coordinates" to "viewport coordinates" | Introduce `originX/originY` explicitly; before drawing, `setTransform(DPR*z,0,0,DPR*z, DPR*ox, DPR*oy)` |
+| 9 | Text overlaps the decorative edge | Layout used unscaled margins while decoration used scaled values | Have both read the **same** already-scaled quantity |
+| 10 | The look is just slightly off from the target and will not converge | Defaults/constants were invented (see §0.2) | Grep each magic number back to the source |
 
-## A4. 用探针跑复刻件，不要用眼睛跑
+## A4. Run a Replica With the Probe, Not With Your Eyes
 
 ```bash
 export CHROME_PATH="<chromium>"
@@ -231,4 +224,4 @@ PORT=9601 OUT=replica-shot.png WAIT=2500 \
   node <skill>/scripts/cdp_probe.js "file:///<abs>/replica.html"
 ```
 
-探针会在 `env` 里给出 `bootErrs` / `exceptions` / `consoleErrors` 三层错误视图。
+The probe returns the three-layer error view (`bootErrs` / `exceptions` / `consoleErrors`) in `env`.

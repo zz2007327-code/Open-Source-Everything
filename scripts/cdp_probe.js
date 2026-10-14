@@ -1,36 +1,36 @@
 #!/usr/bin/env node
 /**
- * cdp_probe.js — 通用浏览器取证探针
+ * cdp_probe.js — general-purpose browser evidence probe
  *
- * 用 Node 内建 WebSocket 直连无头 Chromium 的 CDP。
- * 不依赖 playwright / puppeteer 包。
+ * Drives a headless Chromium over CDP using Node's built-in WebSocket.
+ * No playwright / puppeteer dependency.
  *
- * 用法:
+ * Usage:
  *   node cdp_probe.js <URL>
  *
- * 环境变量:
- *   CHROME_PATH=<path>   Chromium / Chrome 可执行文件（必填）
- *   OUT=<path>           截图输出路径（默认 probe.png）
- *   SIZE=WxH             视口尺寸（默认 1280x900）
- *   WAIT=<ms>            页面 load 之后的基础等待（默认 3000）
- *   WAIT2=<ms>           交互后等待（默认 3000）
- *   READY=<js expr>      轮询此表达式直到真值；用于等字体/数据就绪
- *   READY_TIMEOUT=<ms>   READY 轮询上限（默认 25000）
- *   FOCUS=<selector>     聚焦元素（配合 TYPE 使用）
- *   TYPE=<text>          向聚焦元素插入文本（模拟输入法）
- *   CLICK=<selector>     点击元素，并派发 input/change 冒泡事件
- *   EVAL=<js expr>       求值并打印；可继续写 EVAL2 / EVAL3 …
- *   CLIP=x,y,w,h         截图裁剪区域
- *   SCALE=<n>            CLIP 的缩放倍数（默认 2）
- *   FULL=1               整页截图（含视口外）
- *   PORT=<n>             调试端口（默认 9333）
- *   JSON=<path>          把结构化结果写入该 JSON 文件
- *   DUMP=<path>          把**运行态** document.documentElement.outerHTML 落盘
- *                        （用它代替 curl —— 静态抓取常拿到旧构建，见下）
- *   SOFTWEBGL=1          追加软件渲染开关，尝试让无头环境具备 WebGL 能力
- *   NOAUDIT=1            跳过环境能力自检
+ * Environment variables:
+ *   CHROME_PATH=<path>   Chromium / Chrome executable (required)
+ *   OUT=<path>           screenshot output path (default probe.png)
+ *   SIZE=WxH             viewport size (default 1280x900)
+ *   WAIT=<ms>            base wait after page load (default 3000)
+ *   WAIT2=<ms>           wait after interaction (default 3000)
+ *   READY=<js expr>      poll this expression until truthy; for waiting on fonts/data
+ *   READY_TIMEOUT=<ms>   READY poll ceiling (default 25000)
+ *   FOCUS=<selector>     focus an element (pair with TYPE)
+ *   TYPE=<text>          insert text into the focused element (simulates IME input)
+ *   CLICK=<selector>     click an element and dispatch bubbling input/change events
+ *   EVAL=<js expr>       evaluate and print; continue with EVAL2 / EVAL3 …
+ *   CLIP=x,y,w,h         screenshot clip region
+ *   SCALE=<n>            scale factor for CLIP (default 2)
+ *   FULL=1               full-page screenshot (including beyond viewport)
+ *   PORT=<n>             debug port (default 9333)
+ *   JSON=<path>          write the structured result to this JSON file
+ *   DUMP=<path>          write the **runtime** document.documentElement.outerHTML to disk
+ *                        (use this instead of curl — static fetches often return a stale build, see below)
+ *   SOFTWEBGL=1          append software-rendering flags to try to give the headless env WebGL
+ *   NOAUDIT=1            skip the environment capability audit
  *
- * 示例:
+ * Examples:
  *   CHROME_PATH=/path/chrome OUT=shot.png FULL=1 WAIT=6000 \
  *     DUMP=work/live.html node cdp_probe.js "https://example.com/app"
  *
@@ -38,21 +38,28 @@
  *     EVAL="document.querySelector('canvas').width" \
  *     node cdp_probe.js "https://example.com/app"
  *
- * 设计要点（都是踩过的坑，改动前请先读）:
- *   1. 页面用 about:blank 启动，attach 之后再 Page.navigate —— 这样
- *      Page.addScriptToEvaluateOnNewDocument 才能**在页面任何脚本之前**注入，
- *      从而捕获**脚本初始化阶段**的抛错。（加载后再 Runtime.evaluate 注入是抓不到的。）
- *   2. 除了 JS 侧 window.__probeErrs，还并行收 Runtime.exceptionThrown /
- *      Runtime.consoleAPICalled / Log.entryAdded —— 三层兜底，避免「errs 为空但页面明显崩了」。
- *   3. 内建环境能力自检：WebGL 可用性、rAF 是否被节流、内联脚本字节数、外部脚本清单。
- *      前两项决定「能不能验」，后两项用于**对抗旧构建**（跟静态抓到的文件比字节数）。
- *   4. 无头 Chromium 必须带 --no-sandbox --disable-setuid-sandbox，
- *      否则报 "Sandbox cannot access executable ... 拒绝访问 (0x5)"。本脚本已内置。
- *   5. **SOFTWEBGL=1 实测有效**：缺省下 getContext('webgl2'|'webgl') 返回 false
- *      （--disable-gpu 所致），加 --enable-unsafe-swiftshader --use-angle=swiftshader
- *      后拿到 "WebGL 2.0 (OpenGL ES 3.0 Chromium)"，依赖 WebGL 的页面才验得动。
- *   6. rAF 在 **file:// 本地页面**上会被节流（远程页面正常）。本地复刻件须备
- *      setInterval 兜底，否则动画「假死」；本脚本会在帧数异常时提示。
+ * Design notes (all of them are pitfalls we already hit — read before changing):
+ *   1. The page is launched on about:blank and we attach before Page.navigate — only
+ *      then can Page.addScriptToEvaluateOnNewDocument inject **before any page script**,
+ *      which is what lets us capture errors thrown **during script initialization**.
+ *      (Injecting with Runtime.evaluate after load cannot catch those.)
+ *   2. Besides the JS-side window.__probeErrs we also collect Runtime.exceptionThrown /
+ *      Runtime.consoleAPICalled / Log.entryAdded in parallel — three layers of fallback
+ *      so we never end up with "errs is empty but the page is clearly broken".
+ *   3. Built-in environment capability audit: WebGL availability, whether rAF is being
+ *      throttled, inline-script byte count, external script list. The first two decide
+ *      "can we verify at all"; the last two are for **fighting stale builds** (compare
+ *      byte counts against the statically fetched files).
+ *   4. Headless Chromium must be run with --no-sandbox --disable-setuid-sandbox,
+ *      otherwise it reports "Sandbox cannot access executable ... access denied (0x5)".
+ *      This script already includes them.
+ *   5. **SOFTWEBGL=1 works in practice**: by default getContext('webgl2'|'webgl') returns
+ *      false (caused by --disable-gpu); adding --enable-unsafe-swiftshader
+ *      --use-angle=swiftshader yields "WebGL 2.0 (OpenGL ES 3.0 Chromium)", and only then
+ *      can WebGL-dependent pages actually be verified.
+ *   6. rAF is throttled on **file:// local pages** (remote pages are fine). Local replicas
+ *      must keep a setInterval fallback or the animation "freezes"; this script warns when
+ *      the frame count looks abnormal.
  */
 
 const { spawn } = require("child_process");
@@ -67,8 +74,9 @@ if (!URL_ || URL_ === "-h" || URL_ === "--help") {
   process.exit(URL_ ? 0 : 1);
 }
 
-// 便利：允许把 KEY=VALUE 写成命令行参数（等价于环境变量）。
-// 避免 `cmd VAR=x` 在 shell 中被当作参数而非环境变量的常见误用。
+// Convenience: allow KEY=VALUE to be written as a command-line argument
+// (equivalent to setting the environment variable). Avoids the common misuse of
+// `cmd VAR=x`, where the shell treats it as an argument rather than an env var.
 for (const a of process.argv.slice(3)) {
   const m = a.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
   if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2];
@@ -76,7 +84,7 @@ for (const a of process.argv.slice(3)) {
 
 const CHROME = process.env.CHROME_PATH;
 if (!CHROME) {
-  console.error("缺少 CHROME_PATH：请指向 Chromium / Chrome 可执行文件");
+  console.error("CHROME_PATH is missing: point it at the Chromium / Chrome executable");
   process.exit(1);
 }
 
@@ -114,15 +122,16 @@ function originOf(u) {
 }
 
 /**
- * 注入到**每个新文档最前面**的引导脚本。
- * 必须在任何页面脚本之前执行，否则捕获不到初始化期抛错。
- * 注意：它是靠 CDP 注入的，不属于 DOM，因此不会污染 DUMP 出来的 outerHTML。
+ * Bootstrap script injected at the very front of **every new document**.
+ * It must run before any page script, otherwise initialization-time errors are missed.
+ * Note: it is injected via CDP and is not part of the DOM, so it does not pollute the
+ * outerHTML produced by DUMP.
  */
 const BOOTSTRAP = `(function () {
   if (window.__cdpProbe) return;
   var P = { errs: [], raf: 0, t0: Date.now(), consoleErrors: [] };
   window.__cdpProbe = P;
-  window.__probeErrs = P.errs;                      // 兼容旧写法
+  window.__probeErrs = P.errs;                      // legacy alias
   window.addEventListener('error', function (e) {
     P.errs.push(String((e && (e.message || e.error)) || e));
   }, true);
@@ -149,7 +158,7 @@ const BOOTSTRAP = `(function () {
   } catch (_) {}
 })();`;
 
-/** 环境能力自检：能不能验（WebGL / rAF）+ 抓到的构建长什么样（字节数）*/
+/** Environment capability audit: can we verify (WebGL / rAF) + what the captured build looks like (bytes) */
 const AUDIT = `(function () {
   var out = { webgl: false, webglVersion: null, webglError: null };
   try {
@@ -158,7 +167,8 @@ const AUDIT = `(function () {
     out.webgl = !!gl;
     if (gl && gl.getParameter) out.webglVersion = String(gl.getParameter(gl.VERSION));
   } catch (e) { out.webglError = String(e && e.message || e); }
-  // 这个页面看起来是不是「需要 WebGL」——决定无 WebGL 时要不要示警，避免 2D 页面误报
+  // Does this page look like it "needs WebGL"? — decides whether to warn when there is
+  // no WebGL, so 2D pages are not false-flagged.
   try {
     var src = String(document.documentElement.outerHTML || '');
     out.webglHint = /webgl|three\.|threejs|babylon|pixi\.|regl|gl-matrix|webkit3d|vite-plugin-gl/i.test(src);
@@ -201,10 +211,12 @@ const AUDIT = `(function () {
     `--window-size=${VW},${VH}`,
   ];
   if (process.env.SOFTWEBGL === "1") {
-    // 无头环境默认拿不到 WebGL；这两个开关让 WebGL 走 SwiftShader 软件渲染。
+    // Headless cannot get WebGL by default; these two flags route WebGL through
+    // SwiftShader software rendering.
     args.push("--enable-unsafe-swiftshader", "--use-angle=swiftshader");
   }
-  // 先用 about:blank 启动：保证 attach 后再导航，注入才能抢在页面脚本之前
+  // Launch on about:blank first: this guarantees we attach before navigating, so the
+  // injection can beat the page scripts.
   args.push("about:blank");
 
   const child = spawn(CHROME, args, { stdio: "ignore" });
@@ -235,7 +247,7 @@ const AUDIT = `(function () {
         if (target) break;
       } catch {}
     }
-    if (!target) throw new Error("找不到可调试的页面目标");
+    if (!target) throw new Error("no debuggable page target found");
     console.log("target:", target.url);
     report.steps.push({ step: "attach", url: target.url });
 
@@ -249,7 +261,7 @@ const AUDIT = `(function () {
         pending.delete(m.id);
         return;
       }
-      // ---- 事件流：CDP 级兜底，捕获 JS 侧钩子可能漏掉的错误 ----
+      // ---- Event stream: CDP-level fallback, catches errors the JS-side hooks may miss ----
       if (m.method === "Runtime.exceptionThrown") {
         const d = (m.params && m.params.exceptionDetails) || {};
         report.exceptions.push(
@@ -283,7 +295,7 @@ const AUDIT = `(function () {
         returnByValue: true,
         awaitPromise: true,
       });
-      if (r.exceptionDetails) throw new Error("EVAL 抛错: " + (r.exceptionDetails.text || ""));
+      if (r.exceptionDetails) throw new Error("EVAL threw: " + (r.exceptionDetails.text || ""));
       return r.result.value;
     };
 
@@ -293,7 +305,7 @@ const AUDIT = `(function () {
       await send("Log.enable");
     } catch {}
 
-    // 关键顺序：先注入（对后续文档生效），再导航
+    // Critical ordering: inject first (applies to subsequent documents), then navigate.
     const inj = await send("Page.addScriptToEvaluateOnNewDocument", { source: BOOTSTRAP });
     report.steps.push({ step: "bootstrap-injected", identifier: inj && inj.identifier });
 
@@ -316,8 +328,9 @@ const AUDIT = `(function () {
       } catch {}
       navState = rs;
       if (rs === "complete") break;
-      // 重模块页面常长期停在 interactive（模块图未收敛）；给 12s 宽限就走，
-      // 不要为等一个永远不会 complete 的页面空耗到 NAV_TIMEOUT。
+      // Module-heavy pages often sit at "interactive" for a long time (the module graph
+      // never settles); give them a 12s grace period and move on rather than burning the
+      // whole NAV_TIMEOUT waiting for a page that will never reach "complete".
       if (rs === "interactive" && Date.now() - tn > 12000) break;
     }
     report.steps.push({ step: "navigated", elapsedMs: Date.now() - tn, readyState: navState });
@@ -325,7 +338,7 @@ const AUDIT = `(function () {
 
     await sleep(WAIT);
 
-    // ---- 环境能力自检 ----
+    // ---- Environment capability audit ----
     if (process.env.NOAUDIT !== "1") {
       try {
         const audit = JSON.parse(await evaluate(AUDIT));
@@ -333,15 +346,18 @@ const AUDIT = `(function () {
         console.log("env:", JSON.stringify(audit));
         if (!audit.webgl && audit.webglHint) {
           console.warn(
-            "⚠ 本环境无 WebGL，而页面疑似依赖它（命中 webgl/three/babylon 等特征）：渲染效果**无法验证**。" +
-              "可加 SOFTWEBGL=1 重试；仍失败则如实记为取证缺口，不要凭空描述画面。"
+            "WARNING: no WebGL in this environment while the page appears to depend on it " +
+              "(matches webgl/three/babylon and similar signatures): rendered output **cannot be verified**. " +
+              "Retry with SOFTWEBGL=1; if it still fails, record it honestly as an evidence gap — " +
+              "do not describe the visuals from imagination."
           );
         }
         if (audit.canvases > 0 && audit.elapsedMs > 6000 && audit.rafFrames < 5) {
           console.warn(
-            `⚠ rAF 未运行：${(audit.elapsedMs / 1000).toFixed(1)}s 内仅 ${audit.rafFrames} 帧（页面有 canvas）。` +
-              "两种可能：① 无头环境节流（本地 file:// 复刻件常见）；② 页面初始化就失败了，根本没排帧。" +
-              "先看 bootErrs / exceptions 再下判断。"
+            `WARNING: rAF is not running: only ${audit.rafFrames} frames in ${(audit.elapsedMs / 1000).toFixed(1)}s ` +
+              "(and the page has a canvas). Two possibilities: (1) headless throttling (common for local " +
+              "file:// replicas); (2) the page failed during initialization and never queued a frame at all. " +
+              "Check bootErrs / exceptions before drawing any conclusion."
           );
         }
       } catch (e) {
@@ -395,10 +411,12 @@ const AUDIT = `(function () {
       await sleep(WAIT2);
     }
 
-    // 收集 EVAL / EVAL2 / EVAL3 …
-    // 注：`Number("EVAL".replace("EVAL","") || 0)` → Number(0) === 0，因此 EVAL 与 EVAL0 同键值。
-    // 二者求值顺序不确定，但语义等价（都只是「求值并打印」），无需修正。
-    // 真正需要顺序保证的用法，请把依赖写在同一个 EVAL 里（如 EVAL="(()=>{a(); return b()})()"）。
+    // Collect EVAL / EVAL2 / EVAL3 …
+    // Note: `Number("EVAL".replace("EVAL","") || 0)` → Number(0) === 0, so EVAL and EVAL0
+    // share the same sort key. Their relative evaluation order is therefore undefined, but
+    // they are semantically equivalent (both just "evaluate and print"), so no fix is needed.
+    // If you genuinely need ordering, put the dependency inside a single EVAL,
+    // e.g. EVAL="(()=>{a(); return b()})()".
     const evalKeys = Object.keys(process.env)
       .filter((k) => /^EVAL\d*$/.test(k))
       .sort((a, b) => Number(a.replace("EVAL", "") || 0) - Number(b.replace("EVAL", "") || 0));
@@ -413,7 +431,7 @@ const AUDIT = `(function () {
       }
     }
 
-    // ---- 运行态 DOM 落盘（对抗「curl 抓到的是旧构建」）----
+    // ---- Runtime DOM dump (to fight "curl fetched a stale build") ----
     if (DUMP) {
       try {
         const html = await evaluate("document.documentElement.outerHTML");
@@ -435,7 +453,7 @@ const AUDIT = `(function () {
     if (report.exceptions.length) console.log("page exceptions (cdp):", JSON.stringify(report.exceptions));
     if (report.consoleErrors.length) console.log("console errors:", JSON.stringify(report.consoleErrors));
 
-    // 截图
+    // Screenshot
     const shot = { format: "png" };
     if (process.env.CLIP) {
       const [x, y, w, h] = process.env.CLIP.split(",").map(Number);

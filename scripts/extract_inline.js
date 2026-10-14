@@ -1,25 +1,25 @@
 #!/usr/bin/env node
 /**
- * extract_inline.js — 从 HTML 抽出内联脚本、美化可读、并统计关键字频次
+ * extract_inline.js — Extract inline scripts from HTML, beautify them for readability, and count keyword frequencies
  *
- * 用途：把「它到底用没用 X」从猜测变成事实。先跑统计，再决定读哪一段代码。
+ * Purpose: turn "does it actually use X" from a guess into a fact. Run the counts first, then decide which segment to read.
  *
- * 用法:
- *   node extract_inline.js <input.html> [选项]
+ * Usage:
+ *   node extract_inline.js <input.html> [options]
  *
- * 选项:
- *   --out <dir>      输出目录（默认 rea-work）
- *   --beautify       对最大的内联脚本生成 .pretty.js（需 npx js-beautify）
- *   --all            --beautify 时美化全部内联脚本
- *   --api            打印关键字频次表（默认开启）
- *   --no-api         关闭频次表
- *   --keys "a,b,c"   追加自定义关键字
- *   --top <n>        频次表最多显示 n 行（默认 60）
+ * Options:
+ *   --out <dir>      Output directory (default: rea-work)
+ *   --beautify       Generate .pretty.js for the largest inline script (requires npx js-beautify)
+ *   --all            With --beautify, beautify every inline script
+ *   --api            Print the keyword frequency table (on by default)
+ *   --no-api         Disable the frequency table
+ *   --keys "a,b,c"   Append custom keywords
+ *   --top <n>        Show at most n rows in the frequency table (default: 60)
  *
- * 产出:
- *   <dir>/inline-1.js         最大的内联脚本（按体积降序命名）
- *   <dir>/inline-1.pretty.js  --beautify 时生成
- *   stdout                    各块体积、外部脚本列表、关键字频次表、重要项未使用清单
+ * Output:
+ *   <dir>/inline-1.js         The largest inline script (named by descending size)
+ *   <dir>/inline-1.pretty.js  Generated with --beautify
+ *   stdout                    Per-block sizes, external script list, keyword frequency table, notable "not used" list
  */
 
 const fs = require("fs");
@@ -47,12 +47,12 @@ const TOP = Number(opt("--top", 60));
 const CUSTOM_KEYS = (opt("--keys", "") || "").split(",").map((s) => s.trim()).filter(Boolean);
 
 if (!fs.existsSync(input)) {
-  console.error(`找不到输入文件: ${input}`);
+  console.error(`Input file not found: ${input}`);
   process.exit(1);
 }
 const html = fs.readFileSync(input, "utf8");
 
-// ---------- 1. 切分 script 标签 ----------
+// ---------- 1. Split script tags ----------
 const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
 const inline = [];
 const external = [];
@@ -70,14 +70,14 @@ while ((m = re.exec(html))) {
 }
 
 console.log("=".repeat(64));
-console.log(`输入: ${input}  (${(html.length / 1024).toFixed(1)} KB)`);
-console.log(`内联脚本: ${inline.length} 块   外部脚本: ${external.length} 个`);
+console.log(`Input: ${input}  (${(html.length / 1024).toFixed(1)} KB)`);
+console.log(`Inline scripts: ${inline.length} block(s)   External scripts: ${external.length}`);
 console.log("=".repeat(64));
 
 if (!inline.length) {
-  console.log("\n没有内联脚本。若目标是打包产物，改为逐个读取外部 .js 文件分析。");
+  console.log("\nNo inline scripts. If the target is a bundled build, read the external .js files individually instead.");
   if (external.length) {
-    console.log("\n外部脚本列表:");
+    console.log("\nExternal script list:");
     external.forEach((s, i) => console.log(`  [${i + 1}] ${s}`));
   }
   process.exit(0);
@@ -87,17 +87,17 @@ fs.mkdirSync(OUTDIR, { recursive: true });
 
 inline.sort((a, b) => b.body.length - a.body.length);
 
-console.log("\n内联脚本体积（降序）:");
+console.log("\nInline script sizes (descending):");
 inline.forEach((s, i) => {
   console.log(`  inline-${i + 1}.js  ${(s.body.length / 1024).toFixed(1)} KB   type=${s.type}`);
 });
 
 if (external.length) {
-  console.log("\n外部脚本:");
+  console.log("\nExternal scripts:");
   external.forEach((s) => console.log(`  ${s}`));
 }
 
-// ---------- 2. 落盘 ----------
+// ---------- 2. Write to disk ----------
 const written = [];
 inline.forEach((s, i) => {
   const p = path.join(OUTDIR, `inline-${i + 1}.js`);
@@ -105,17 +105,17 @@ inline.forEach((s, i) => {
   written.push(p);
 });
 const totalKB = (written.reduce((a, p) => a + fs.statSync(p).size, 0) / 1024).toFixed(1);
-console.log(`\n已写出 ${written.length} 个文件到 ${OUTDIR}/  合计 ${totalKB} KB`);
+console.log(`\nWrote ${written.length} file(s) to ${OUTDIR}/  (${totalKB} KB total)`);
 
-// ---------- 3. 美化（可选） ----------
+// ---------- 3. Beautify (optional) ----------
 if (DO_BEAUTIFY) {
   const targets = BEAUTIFY_ALL ? written : [written[0]];
-  console.log("\n美化中（npx js-beautify，首次需联网）…");
+  console.log("\nBeautifying (npx js-beautify; first run needs network)…");
   let failed = 0;
   for (const p of targets) {
     const out = p.replace(/\.js$/, ".pretty.js");
-    // Windows 上 .cmd 不能直接 spawn；统一交给 shell 处理。
-    // 参数各自加引号并转义，避免路径中的 shell 元字符造成注入。
+    // On Windows a .cmd cannot be spawned directly; route everything through the shell.
+    // Quote each argument and escape it to avoid shell metacharacter injection from paths.
     const q = (s) => '"' + String(s).replace(/(["\\])/g, "\\$1") + '"';
     const cmd = ["npx", "-y", "js-beautify@1.15.4", "-f", q(p), "-o", q(out)].join(" ");
     const r = spawnSync(cmd, { shell: true, stdio: "ignore", timeout: 180000 });
@@ -123,54 +123,54 @@ if (DO_BEAUTIFY) {
       console.log(`  ${out}  ${(fs.statSync(out).size / 1024).toFixed(1)} KB`);
     } else {
       failed++;
-      console.log(`  跳过 ${path.basename(p)}（本环境无法派生 npx）`);
+      console.log(`  Skipped ${path.basename(p)} (this environment cannot spawn npx)`);
     }
   }
   if (failed) {
-    // 环境不允许脚本内派生进程时，给出可直接在 shell 执行的确切命令。
-    console.log("\n  可手动执行以下命令完成美化：");
+    // When the environment forbids spawning child processes, print the exact command to run in a shell.
+    console.log("\n  Run the following manually to finish beautifying:");
     for (const p of targets) {
       const out = p.replace(/\.js$/, ".pretty.js");
       console.log(`    npx -y js-beautify@1.15.4 -f "${p}" -o "${out}"`);
     }
-    console.log("  （美化只影响可读性，不影响后续人工阅读原文）");
+    console.log("  (Beautifying only affects readability; it does not affect reading the original source.)");
   }
 }
 
-// ---------- 4. 关键字频次 ----------
+// ---------- 4. Keyword frequencies ----------
 if (SHOW_API) {
   const src = inline.map((s) => s.body).join("\n");
 
   const GROUPS = {
-    "Canvas 绘制": [
-      [String.raw`\.filter\s*=`, "filter 赋值（滤镜）"],
+    "Canvas drawing": [
+      [String.raw`\.filter\s*=`, "filter assignment (filters)"],
       ["getImageData", "getImageData"],
       ["putImageData", "putImageData"],
       ["createImageData", "createImageData"],
       [String.raw`createPattern`, "createPattern"],
-      ["createLinearGradient", "线性渐变"],
-      ["createRadialGradient", "径向渐变"],
-      ["createConicGradient", "锥形渐变"],
-      ["globalCompositeOperation", "合成模式"],
-      ["globalAlpha", "全局透明"],
-      [String.raw`\.clip\s*\(`, "clip 裁剪"],
-      ["setLineDash", "虚线"],
+      ["createLinearGradient", "linear gradient"],
+      ["createRadialGradient", "radial gradient"],
+      ["createConicGradient", "conic gradient"],
+      ["globalCompositeOperation", "composite mode"],
+      ["globalAlpha", "global alpha"],
+      [String.raw`\.clip\s*\(`, "clip"],
+      ["setLineDash", "dashed lines"],
       ["drawImage", "drawImage"],
-      ["bezierCurveTo", "三次贝塞尔"],
-      ["quadraticCurveTo", "二次贝塞尔"],
+      ["bezierCurveTo", "cubic bezier"],
+      ["quadraticCurveTo", "quadratic bezier"],
       ["arcTo", "arcTo"],
       [String.raw`\.ellipse\s*\(`, "ellipse"],
-      ["shadowBlur", "阴影"],
+      ["shadowBlur", "shadow"],
     ],
-    "字体": [
-      ["FontFace", "FontFace 构造"],
+    "Fonts": [
+      ["FontFace", "FontFace constructor"],
       [String.raw`document\.fonts`, "document.fonts"],
-      ["loadFontFace", "loadFontFace（小程序）"],
-      ["unicode-range", "unicode-range 分片"],
+      ["loadFontFace", "loadFontFace (mini program)"],
+      ["unicode-range", "unicode-range slicing"],
       ["woff2", "woff2"],
       [String.raw`\.ttf`, "ttf"],
     ],
-    "存储与网络": [
+    "Storage & network": [
       ["localStorage", "localStorage"],
       ["sessionStorage", "sessionStorage"],
       ["indexedDB", "indexedDB"],
@@ -179,20 +179,20 @@ if (SHOW_API) {
       ["WebSocket", "WebSocket"],
       ["new Worker", "Web Worker"],
     ],
-    "音频与媒体": [
+    "Audio & media": [
       ["AudioContext", "Web Audio"],
       ["MediaRecorder", "MediaRecorder"],
       ["getUserMedia", "getUserMedia"],
       ["captureStream", "captureStream"],
     ],
-    "导出与编码": [
+    "Export & encoding": [
       ["toDataURL", "toDataURL"],
       ["toBlob", "toBlob"],
       ["convertToBlob", "convertToBlob"],
-      ["gifenc|GIFEncoder", "GIF 编码库"],
-      [String.raw`\bGIF\b`, "GIF 字面量"],
+      ["gifenc|GIFEncoder", "GIF encoder library"],
+      [String.raw`\bGIF\b`, "GIF literal"],
     ],
-    "图形与运行时": [
+    "Graphics & runtime": [
       ["Path2D", "Path2D"],
       ["DOMMatrix", "DOMMatrix"],
       ["setTransform", "setTransform"],
@@ -200,10 +200,10 @@ if (SHOW_API) {
       ["WebGL", "WebGL"],
       ["requestAnimationFrame", "rAF"],
     ],
-    "包特征": [
+    "Bundle signatures": [
       ["__webpack_require__", "webpack"],
-      ["sourceMappingURL", "sourcemap 引用"],
-      [String.raw`\bimport\s*\(`, "动态 import"],
+      ["sourceMappingURL", "sourcemap reference"],
+      [String.raw`\bimport\s*\(`, "dynamic import"],
       [String.raw`\brequire\s*\(`, "require"],
     ],
   };
@@ -230,10 +230,11 @@ if (SHOW_API) {
     for (const [pat, label] of items) push(group, label, count(pat));
   }
   for (const k of CUSTOM_KEYS) {
-    push("自定义", k, count(k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    push("Custom", k, count(k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 
-  // 组间按组内总数降序；组内按次数降序。保证同一组连续出现。
+  // Sort groups by their internal total (descending); sort items within a group by count (descending).
+  // This keeps each group's entries contiguous.
   const groups = [...byGroup.entries()]
     .map(([name, items]) => ({
       name,
@@ -243,11 +244,11 @@ if (SHOW_API) {
     .sort((a, b) => b.total - a.total);
 
   console.log("\n" + "=".repeat(64));
-  console.log("关键字频次（出现次数 > 0）");
+  console.log("Keyword frequencies (occurrences > 0)");
   console.log("=".repeat(64));
   let shown = 0;
   outer: for (const g of groups) {
-    console.log(`\n[${g.name}]  (命中 ${g.total})`);
+    console.log(`\n[${g.name}]  (${g.total} hits)`);
     for (const it of g.items) {
       if (shown++ >= TOP) break outer;
       console.log(`  ${String(it.n).padStart(5)}  ${it.label}`);
@@ -255,16 +256,16 @@ if (SHOW_API) {
   }
 
   const notable = zeros.filter((z) =>
-    /filter 赋值|createPattern|getImageData|globalCompositeOperation|WebGL|AudioContext|Path2D|DOMMatrix|OffscreenCanvas/.test(
+    /filter assignment|createPattern|getImageData|globalCompositeOperation|WebGL|AudioContext|Path2D|DOMMatrix|OffscreenCanvas/.test(
       z.label
     )
   );
   if (notable.length) {
     console.log("\n" + "-".repeat(64));
-    console.log("重要项「未使用」（可据此排除整条实现路线）");
+    console.log('Notable items "NOT USED" (you can rule out a whole implementation route from these)');
     console.log("-".repeat(64));
     notable.forEach((z) => console.log(`  NOT USED  ${z.label}`));
   }
 }
 
-console.log("\n完成。下一步：顺主导链路读最大的那块，重点看配置表与核心变换。");
+console.log("\nDone. Next step: read the largest block along the dominant path, focusing on the config tables and the core transform.");

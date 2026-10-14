@@ -1,95 +1,94 @@
-# 学习向写法细则
+# Learning-Oriented Writing Details
 
-主链规格文档中「**当教材用**」那一节的执行手册。适用场景：用户想**搞懂**目标是怎么做的，而不是马上照着造一套。
+The execution handbook for the "**As a textbook**" section in the main-chain spec document. Applies when the user wants to **understand** how the target does something rather than immediately build one.
 
-核心判据：**读完/看完之后，用户能自己把这条链路讲一遍，并且知道哪一处可以改。**
+Core criterion: **after reading/viewing it, the user can explain this chain themselves and knows which part they can change.**
 
-本节是**写进规格文档末尾的一节**，不是独立阶段；产出物全是文档形态，不产可运行页面。
+This section is **written into the end of the spec document**; it is not a standalone phase, and its output is documentation only — no runnable page.
 
 ---
 
-## 1. 与净室向的分工
+## 1. Division of Labor vs. Clean Room
 
-| | 学习向 | 净室向 |
+| | Learning-oriented | Clean-room-oriented |
 |------|-------|-------|
-| 目的 | 弄懂机制、能迁移、能改动 | 自主实现一套同类能力 |
-| 关键内容 | 推理链 + 决定性变量 + 迁移指引 | 剥离后的效果描述 + 接口契约 + 自检表 |
-| 能不能引对方源码 | **能**（教学用途，逐段讲解） | **不能**（实现方必须隔离） |
-| 失败形态 | 只有结论没有推理链，读完还是不懂 | 实现与对方逐字雷同 |
+| Purpose | Understand the mechanism, be able to port it, be able to change it | Independently implement the same capability |
+| Key content | Reasoning chain + decisive variables + porting guidance | Stripped effect description + interface contracts + self-check table |
+| May it quote the target's source? | **Yes** (for teaching, explained segment by segment) | **No** (the implementer must stay isolated) |
+| Failure mode | Conclusions without a reasoning chain; still does not get it after reading | The implementation is verbatim identical to the target's |
 
-两向不互斥：主链按用户意图写对应那节即可。若用户后续要真的做净室实现，
-再按 `clean-room-design.md` 走完整的分工与自检流程。
-
----
-
-## 2. 这一节的结构
-
-按「入口 → 输入 → 处理 → 输出」讲主导链路。每一环都要有：**结论 + 证据 + 为什么**。
-
-推荐骨架（作为规格文档的一个章节）：
-
-```
-X. 当教材用：把这条链路讲明白
-
-一、它到底在干什么（三句话，无术语）
-二、整体链路（一张表看完全程，标注每级的中间数据结构）
-三、逐环节拆解
-    （一）入口 —— 目标藏在哪一层、怎么加载起来的
-    （二）输入 —— 用户的动作怎么变成数据
-    （三）处理 —— 核心算法链，逐级数据结构变化
-    （四）输出 —— 怎么画出来 / 怎么导出
-四、关键设计决策（为什么必须这么做）
-五、决定性变量（改哪个参数观感就全变）
-六、我能改哪一处（迁移与二次开发指引）
-七、未知与未验证项（诚实标注）
-```
-
-> **载体适配**：走 .docx 时，「整体链路」用 **GFM 表格**（阶段 / 处理 / 中间数据结构），
-> 不要试图用图形渲染。表格在转换链路上稳、读者也能扫。详见 `docx-delivery.md`。
-
-### 写作纪律
-
-1. **术语双写**：术语第一次出现时，先给专业表述，紧跟一句大白话。
-   - 好：`globalCompositeOperation 设为 multiply`（合成模式用「正片叠底」，相当于两层颜料叠上去，暗的更暗）。
-   - 差：直接甩 `multiply` 不做解释。
-2. **推理链要显形**：不只写「它用了 X」，要写「因为要达成 A，而 B 手段做不到，所以只能 X」。
-3. **每段配证据**：源码位置（文件:行）或实测数据。**没有证据的段落标为「推断」**。
-4. **不夸大**：未观测到的不写「想必是……」，直接进第七章。
+The two are not mutually exclusive: the main chain just writes the section matching the user's intent. If the user later actually performs a clean-room implementation, then follow the full role-separation and self-check process in `clean-room-design.md`.
 
 ---
 
-## 3. 「看得见」怎么承载
+## 2. Structure of This Section
 
-### 3.1 用表格承载，不做演示页面
+Explain the dominant chain as entry → input → processing → output. Every link needs: **conclusion + evidence + why**.
 
-机制的结构与视觉呈现靠三样东西：
+Recommended skeleton (as one chapter of the spec document):
 
-| 承载物 | 用途 | 注意 |
+```
+X. As a textbook: explain this chain clearly
+
+1. What it actually does (three sentences, no jargon)
+2. The overall chain (one table covering the whole process, annotating the intermediate data structure at each level)
+3. Link-by-link breakdown
+    (1) Entry — which layer the target hides in, how it loads
+    (2) Input — how the user's actions become data
+    (3) Processing — the core algorithm chain, data structure changes level by level
+    (4) Output — how it is drawn / how it is exported
+4. Key design decisions (why it must be done this way)
+5. Decisive variables (change which parameter and the whole look changes)
+6. What I can change (porting and secondary-development guidance)
+7. Unknowns and unverified items (honest annotation)
+```
+
+> **Medium adaptation**: for .docx, render "the overall chain" as a **GFM table** (stage / processing / intermediate data structure);
+> do not attempt graphical rendering. Tables are stable through the conversion chain and readers can scan them. See `docx-delivery.md`.
+
+### Writing Discipline
+
+1. **Bilingual terms**: at a term's first occurrence, give the professional formulation first, immediately followed by a plain-language gloss.
+   - Good: `globalCompositeOperation set to multiply` (the composite mode is "multiply", which is like stacking two layers of paint so the dark gets darker).
+   - Bad: dropping `multiply` with no explanation.
+2. **Make the reasoning chain explicit**: do not just write "it uses X"; write "because it needs to achieve A, and B cannot, it can only be X".
+3. **Evidence for every passage**: a source location (file:line) or measured data. **Mark any passage lacking evidence as "inferred"**.
+4. **No exaggeration**: do not write "it must be …" for things not observed; send them straight to chapter 7.
+
+---
+
+## 3. How to Carry the "Visible" Part
+
+### 3.1 Carry it with tables, not with a demo page
+
+The mechanism's structure and visual presentation rest on three things:
+
+| Carrier | Purpose | Note |
 |--------|------|------|
-| **表格** | 链路级别、参数、规格 | 主力。参数列写数值表达式，不写形容词 |
-| **源码摘录** | 关键机制的原文证据 | 3–5 行即可，标注文件:行，不必整段贴 |
-| **真实目标截图** | 呈现最终效果与关键中间态 | 探针 `OUT=` 截图。旁证角色，不替代数据 |
+| **Tables** | Chain levels, parameters, specs | The workhorse. Write numeric expressions in the parameter column, not adjectives |
+| **Source excerpts** | Source evidence for key mechanisms | 3–5 lines suffice; annotate file:line; no need to paste whole blocks |
+| **Real target screenshots** | Present the final effect and key intermediate states | Probe `OUT=` screenshots. A corroborating role; they do not replace data |
 
-> **不要**因为「说不清」就去做一个可视化页面。想清楚要用表格表达哪三列，往往就写出来了。
-
----
-
-## 4. 收尾三问
-
-交付时把这三问明确写给用户，让他自测是否真的学懂：
-
-1. **它是怎么做到的？** —— 不看笔记，能否把主导链路讲一遍。
-2. **换个约束还成立吗？** —— 换平台/换尺寸/换输入源，哪一环会先崩。
-3. **我能改哪一处？** —— 指出那个「决定性变量」，说明改了会怎样。
+> **Do not** build a visualization page just because something is "hard to explain". Think through which three columns the table needs and it usually writes itself.
 
 ---
 
-## 5. 自检清单
+## 4. The Closing Three Questions
 
-- [ ] 结论均有证据（源码位置 / 实测数据 / 截图），术语已双写。
-- [ ] 推理链显形——每个「它用了 X」都跟了「为什么只能这样」。
-- [ ] 整体链路用一张表覆盖全程，标注中间数据结构。
-- [ ] 决定性变量已列出，并说明改了会怎样。
-- [ ] 未知项诚实列出，不假装都搞懂了。
-- [ ] 三问自测已写进交付说明。
-- [ ] **全程没有产出可运行页面 / demo / 教学沙盘。**
+At delivery, put these three questions explicitly to the user so they can self-test whether they truly understood:
+
+1. **How does it do it?** — Without looking at notes, can they explain the dominant chain?
+2. **Does it still hold under a different constraint?** — Change platform/size/input source; which link breaks first?
+3. **What can I change?** — Point to the "decisive variable" and explain what changing it does.
+
+---
+
+## 5. Self-Check List
+
+- [ ] Conclusions all have evidence (source location / measured data / screenshot), and terms are written bilingually.
+- [ ] The reasoning chain is explicit — every "it uses X" is followed by "why it can only be this".
+- [ ] The overall chain is covered by a single table with intermediate data structures annotated.
+- [ ] Decisive variables are listed, with an explanation of what changing them does.
+- [ ] Unknowns are listed honestly; no pretense of understanding everything.
+- [ ] The three self-test questions are written into the delivery notes.
+- [ ] **No runnable page / demo / teaching sandbox was produced at any point.**
