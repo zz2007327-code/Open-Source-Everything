@@ -19,6 +19,15 @@
 
 ## 🌐 English
 
+<!--
+GitHub repository metadata (About field, max 350 chars) — paste into the repo's About box:
+
+Reverse-engineer runnable targets (websites, SPAs, browser apps, mini programs, Electron, binaries) into evidence-backed mechanism notes, then distill them into build-ready functional specs. / 把网站、SPA、浏览器应用、子应用、小程序、Electron、二进制等可运行目标逆向拆解成有证据支撑的机制说明，再蒸馏成可直接施工的功能文档并交付 .docx。
+
+Repo topics:
+reverse-engineering, teardown, clean-room, functional-spec, ai-skill, browser-automation, cdp, docx, specification, sandbox-analysis
+-->
+
 ### What It Is
 
 **"Open-sourcing everything" does not mean reading the target's open-source code — it means taking something closed and breaking it down into knowledge that can be read, rebuilt, and freely reimplemented.** What you inspect is behavior; what you produce is your own implementation.
