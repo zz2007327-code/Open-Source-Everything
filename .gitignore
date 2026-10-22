@@ -14,6 +14,9 @@ pipeline-state.yaml
 # S3 检索缓存（本地降本层，不入库）
 .ds-cache/
 
+# 双语化改写的工作副本与校验脚本（临时）
+.bilingual-orig/
+
 # Node
 node_modules/
 npm-debug.log*
