@@ -1,74 +1,74 @@
-# Functional Spec Document Skeleton
+# 功能规格文档骨架
 
-The output skeleton for Phase 3. The goal is to let an engineer **implement it without ever seeing the original site**.
+Phase 3 的产出骨架。目标是让一位工程师**在完全看不到原站的情况下把它实现出来**。
 
-Writing discipline: give numbers as concrete values + adjustable ranges; give interfaces as signatures; make acceptance items checkable; replace every vague adjective with a number.
-
----
-
-## Recommended Section Structure
-
-```
-Cover (optional, depending on the delivery medium)
-Abstract / Executive summary
-1. Document notes
-    (1) Purpose of this document
-    (2) The shared underlying chain (the unchanged part)      ← the most important chapter
-    (3) Terminology conventions
-2 … N. Per-approach specs (one chapter per approach)
-    (1) Material/shape definition
-    (2) Visual/behavioral feature spec (table)
-    (3) Colors and substrate (or corresponding resources)
-    (4) Node/boundary decoration
-    (5) Motion
-    (6) Variants specific to this approach
-N+1. Implementation interface contracts
-    (1) Change surface list (table: module / changed? / notes)
-    (2) Core interface signatures
-    (3) Internal execution steps (in order)
-    (4) Resource/substrate interfaces
-    (5) Motion-advance interfaces
-    (6) Composition configuration
-N+2. Parameter summary table
-N+3. Acceptance points (per-approach checklist + common checklist)
-N+4. Risks and open items (including evidence gaps)
-N+5. Quick reference of differences from the original implementation (comparison table)
-X.  Usage Notes (write one part per the user's intent)
-      · As a textbook (learning-oriented, see learning-track.md)
-      · As blueprints (clean-room-oriented, see clean-room-design.md)
-```
+写作纪律：数字给具体值 + 可调区间；接口给签名；验收项写成可勾选的；每一个模糊形容词都换成一个数字。
 
 ---
 
-## Chapter-by-Chapter Writing Notes
+## 推荐的章节结构
 
-### "The shared underlying chain" — draw the unchanged surface first
+```
+封面（可选，取决于交付媒介）
+摘要 / 执行摘要
+1. 文档说明
+    (1) 本文目的
+    (2) 共用的底层链路（不变的部分）       ← 最有价值的一章
+    (3) 术语约定
+2 … N. 各方案规格（一个方案一章）
+    (1) 素材/形状定义
+    (2) 视觉/行为特征规格（表格）
+    (3) 配色与基底（或对应资源）
+    (4) 节点/边界装饰
+    (5) 动效
+    (6) 本方案特有变体
+N+1. 实现接口契约
+    (1) 变更面清单（表格：模块 / 是否改动 / 备注）
+    (2) 核心接口签名
+    (3) 内部执行步骤（按顺序）
+    (4) 资源/基底接口
+    (5) 动效推进接口
+    (6) 组合配置
+N+2. 参数总表
+N+3. 验收点（分方案清单 + 公共清单）
+N+4. 风险与待办（含证据缺口）
+N+5. 与原实现的差异速查（对照表）
+X.  使用建议（按用户意图写其中一部分）
+      · 当作教科书（学习向，见 learning-track.md）
+      · 当作蓝图（净室向，见 clean-room-design.md）
+```
 
-**This is the highest-value chapter in the whole document.** Use one table to list every level "from input to output" and mark which ones do not change:
+---
 
-| Stage | Processing | Output |
+## 逐章写作要点
+
+### 「共用的底层链路」—— 先画出不变的面
+
+**这是整份文档里价值最高的一章。** 用一张表把"从输入到输出"的每一层列出来，并标出哪些不变：
+
+| 阶段 | 处理 | 产出 |
 |------|------|------|
-| ① … | Concrete algorithm/call | Intermediate data structure |
+| ① … | 具体的算法/调用 | 中间数据结构 |
 | … | | |
-| ⑥ Landing | **All the differences are in this step** | Final artifact |
+| ⑥ 落地 | **所有差异都在这一步** | 最终产物 |
 
-Then converge in one sentence: **"the only change surface is the draw function at step ⑥"**. The smaller the change surface, the more controllable the implementation cost and the more confident the reader.
+然后用一句话收敛：**"唯一的变更面是第 ⑥ 步的绘制函数"**。变更面越小，实现成本越可控，读者越有信心。
 
-The anti-pattern: opening with "we will build approaches A, B, and C" leaves the reader unable to judge their shared cost.
+反模式：开篇就写"我们将实现 A、B、C 三套方案"，读者无法判断它们共用的成本有多大。
 
-### Per-approach specs — let tables hold down the prose
+### 各方案规格 —— 让表格扛住正文
 
-Always use two-column tables (feature / spec) for visual/behavioral features, and write **numeric expressions** in the spec column rather than adjectives:
+视觉/行为特征一律用两列表格（特征 / 规格），规格列写**数值表达式**而不是形容词：
 
-| Feature | Spec |
+| 特征 | 规格 |
 |------|------|
-| Lateral amplitude | `A = w * 0.34`, where `w` is the nominal width |
-| Wrap period | `λ = w * 3.2`, floating between 2.8–3.8× depending on seed |
-| Main highlight band width | `w * 0.22`, peak opacity 0.92 |
+| 横向振幅 | `A = w * 0.34`，其中 `w` 为标称宽度 |
+| 缠绕周期 | `λ = w * 3.2`，随种子在 2.8–3.8 倍之间浮动 |
+| 主高光带宽度 | `w * 0.22`，峰值不透明度 0.92 |
 
-**All length parameters are relative to the body size `w`**, never absolute pixels — that is the only way to decouple them from font size/scaling.
+**所有长度参数都相对于字号 `w`**，绝不用绝对像素——这是唯一能与字号/缩放解耦的写法。
 
-### Interface contracts — give signatures, not descriptions
+### 接口契约 —— 给签名，不给描述
 
 ```ts
 type StrokeRenderer = (
@@ -80,69 +80,69 @@ type StrokeRenderer = (
 ) => void;
 ```
 
-The key information to provide:
+必须提供的关键信息：
 
-1. **Change surface list**: which modules change, which do not, and how (replace / parameterize / extend / reuse).
-2. **Interface signatures**: name, inputs, outputs, semantics.
-3. **Internal execution steps**: an ordered list, spelling out "what is used, what is layered, in what order" step by step.
-   The order itself is often the key (layering highlight before dispersion looks completely different).
-4. **Composition configuration**: make the approaches a configuration object array, so switching only changes configuration, not the caller.
+1. **变更面清单**：哪些模块要改、哪些不改、怎么改（替换 / 参数化 / 扩展 / 复用）。
+2. **接口签名**：名称、入参、出参、语义。
+3. **内部执行步骤**：有序列表，逐步写清"用了什么、叠了什么、按什么顺序"。
+   顺序本身常常就是关键（高光先叠还是后叠，效果完全不同）。
+4. **组合配置**：把各方案做成配置对象数组，切换方案只改配置，不改调用方。
 
-### Parameter summary table
+### 参数总表
 
-Collect the parameters scattered across chapters into one place, three columns: parameter / value / adjustable range.
-This is the value handbook for implementation and the comparison table for tuning.
+把散落各章的参数收拢到一处，三列：参数 / 取值 / 可调区间。
+这是实现时的数值手册，也是调参时的对照表。
 
-### Acceptance points
+### 验收点
 
-Write them as a **checkable numbered checklist**, with criteria at the "distinguishable to the naked eye" level where possible:
+写成**可勾选的编号清单**，判据尽量落在"肉眼可分辨"这一级：
 
-- Good: `The stroke is visually distinguishable as two intertwined vines, not a single textured line.`
-- Good: `The same character drawn repeatedly with unchanged parameters has identical jitter (the seed is reproducible).`
-- Bad: `The effect should look natural.`
+- 好：`笔画在视觉上能分辨为两条交缠的藤蔓，而不是一条带肌理的线。`
+- 好：`同一字符在参数不变时重复绘制，抖动完全一致（种子可复现）。`
+- 差：`效果要自然。`
 
-Two blocks: a **per-approach checklist** + a **common checklist** (cross-approach constraints, e.g. "switching approaches does not change the underlying structure").
+两块：**分方案清单** + **公共清单**（跨方案的约束，例如"切换方案不改变底层结构"）。
 
-### Risks and open items
+### 风险与待办
 
-A three-column table: item / explanation / recommendation. Write real engineering risks (performance, platform differences, fringing at small sizes); do not write filler like "there may not be enough time".
+三列表格：条目 / 说明 / 建议。写真实的工程风险（性能、平台差异、小尺寸下的边缘毛刺）；不要写"时间可能不够"这类填充。
 
-**"Unknowns and Unverified Items" lives here** and is not optional when non-empty. Two distinct kinds, keep them separate:
+**「未知与未验证项」住在这里**，非空时不可省略。两类要分开写：
 
-| Kind | What it looks like | What the entry must state |
+| 类别 | 长什么样 | 条目必须写清 |
 |---|---|---|
-| **Evidence gap** | The mechanism was not verified: no WebGL, login wall, anti-bot, server-side | What local verification was attempted, why it failed, and that the conclusion rests on source structure or public description |
-| **Deferred decision** | Something was decided by assumption rather than evidence | The assumption made, the cost if it is wrong |
+| **证据缺口** | 机制未验证：没有 WebGL、登录墙、反爬、服务端 | 本地试过哪些验证手段、为什么失败，以及结论依据的是源码结构还是公开描述 |
+| **待定决策** | 某处是按假设定的，不是按证据定的 | 做了什么假设、假设错了代价多大 |
 
-Any **decisive link** supported only by web research lands in the first row — never silently in the body. Citations live **next to the sentence they support**; do not collect them into a detached references section at the end, which is exactly how an unmarked claim slips through.
+任何**只靠网络调研支撑的决定性环节**都要落到第一行——绝不能悄悄留在正文里。引证放在**它所支撑的那句话旁边**；不要收集到文末一个独立的参考文献章节，那正是未标注断言溜过去的方式。
 
-### Difference quick-reference
+### 差异速查
 
-Close with a comparison table, dimension × approach. Let the reader locate the row they need at a glance and follow the row name back to the corresponding chapter.
+结尾给一张对照表，维度 × 方案。让读者一眼定位到自己需要的那一行，再顺着行名回到对应章节。
 
 ---
 
-## Delivery Medium Adaptation
+## 交付媒介适配
 
-| Medium | Adaptation notes |
+| 媒介 | 适配要点 |
 |------|---------|
-| **.docx** (via tencent-docx) | Use GFM tables + level-3/4 headings; use fenced code blocks for code; see `docx-delivery.md` for structure |
-| **Single-file HTML** (tech talk) | The main chain does **not** produce HTML. If the user explicitly wants an interactive demo, handle it as a separate add-on task; do not mix it into the spec document |
-| **Markdown** | Write directly per the structure above; use GFM for tables |
+| **.docx**（走 tencent-docx） | 用 GFM 表格 + 三/四级标题；代码用围栏代码块；结构见 `docx-delivery.md` |
+| **单文件 HTML**（技术分享） | 主链**不产出** HTML。用户明确要交互 demo 时，作为独立附加任务处理，不要混进规格文档 |
+| **Markdown** | 直接按上述结构写；表格用 GFM |
 
-Regardless of medium, **the content structure is identical** — the medium only affects typesetting, not the section skeleton.
+无论哪种媒介，**内容结构完全一致**——媒介只影响排版，不影响章节骨架。
 
 ---
 
-## Self-Check List
+## 自检清单
 
-Go through every item before delivery:
+交付前逐条过一遍：
 
-1. [ ] Both "the unchanged part" and "the change surface" are explicitly written out, and the change surface is converged to a minimum.
-2. [ ] Every number is a concrete value or expression; no "appropriately", "slightly", "about right".
-3. [ ] Every approach has a checkable acceptance checklist with criteria at the naked-eye level.
-4. [ ] Interfaces have complete signatures; the caller does not have to guess parameter meanings.
-5. [ ] Execution steps have an explicit order, and critical order changes are annotated.
-6. [ ] All length parameters are relative to the body size, not absolute pixels.
-7. [ ] Risk items are engineering risks and have corresponding recommended actions.
-8. [ ] There is a closing difference quick-reference table.
+1. [ ] 「不变的部分」与「变更面」都显式写出，且变更面收敛到最小。
+2. [ ] 每个数字都是具体值或表达式；没有"适当""略微""差不多"。
+3. [ ] 每个方案都有可勾选的验收清单，判据落在肉眼可分辨这一级。
+4. [ ] 接口签名完整；调用方不需要猜参数含义。
+5. [ ] 执行步骤有明确顺序，关键顺序变化处有标注。
+6. [ ] 所有长度参数都相对于字号，不是绝对像素。
+7. [ ] 风险项是工程风险，且都有对应的建议动作。
+8. [ ] 结尾有差异速查表。
