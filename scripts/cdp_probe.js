@@ -70,7 +70,8 @@ const http = require("http");
 
 const URL_ = process.argv[2];
 if (!URL_ || URL_ === "-h" || URL_ === "--help") {
-  console.log(fs.readFileSync(__filename, "utf8").split("*/")[0].replace(/^\/\*\*?/, ""));
+  const head = fs.readFileSync(__filename, "utf8").split("*/")[0];
+  console.log(head.replace(/^#![^\n]*\n/, "").replace(/^\/\*\*?[ \t]?/, "").replace(/^\n+/, ""));
   process.exit(URL_ ? 0 : 1);
 }
 
@@ -132,6 +133,8 @@ const BOOTSTRAP = `(function () {
   var P = { errs: [], raf: 0, t0: Date.now(), consoleErrors: [] };
   window.__cdpProbe = P;
   window.__probeErrs = P.errs;                      // legacy alias
+  window.__cdpProbeExceptions = [];                 // CDP-layer Runtime.exceptionThrown, pushed from Node
+  window.__cdpProbeConsoleErrors = [];              // CDP-layer console errors, pushed from Node
   window.addEventListener('error', function (e) {
     P.errs.push(String((e && (e.message || e.error)) || e));
   }, true);
@@ -192,6 +195,11 @@ const AUDIT = `(function () {
     return { src: f.getAttribute('src'), dataSrc: f.getAttribute('data-src'), id: f.id };
   });
   out.readyState = document.readyState;
+  // Mirror the CDP-level collectors into env so that the single "read env first" habit
+  // (web-target-teardown §3.0, replica-verification §6) sees all three layers in one place.
+  // The authoritative copies stay at the top level of the report.
+  out.exceptions = (window.__cdpProbeExceptions || []).slice(0, 12);
+  out.cdpConsoleErrors = (window.__cdpProbeConsoleErrors || []).slice(0, 12);
   return JSON.stringify(out);
 })()`;
 
@@ -254,6 +262,26 @@ const AUDIT = `(function () {
     const ws = new WebSocket(target.webSocketDebuggerUrl);
     let id = 0;
     const pending = new Map();
+    // Events can arrive before the page has run the bootstrap, so buffer them and flush
+    // once the probe is ready to evaluate against the live document.
+    const mirrorQueue = [];
+    let mirrorReady = false;
+    const mirrorToPage = (bucket, text) => {
+      if (!mirrorReady) {
+        if (mirrorQueue.length < 200) mirrorQueue.push([bucket, text]);
+        return;
+      }
+      ws.send(
+        JSON.stringify({
+          id: ++id,
+          method: "Runtime.evaluate",
+          params: {
+            expression: `(window.${bucket}||(window.${bucket}=[])).push(${JSON.stringify(text)})`,
+            returnByValue: true,
+          },
+        })
+      );
+    };
     ws.addEventListener("message", (ev) => {
       const m = JSON.parse(ev.data);
       if (m.id && pending.has(m.id)) {
@@ -264,20 +292,27 @@ const AUDIT = `(function () {
       // ---- Event stream: CDP-level fallback, catches errors the JS-side hooks may miss ----
       if (m.method === "Runtime.exceptionThrown") {
         const d = (m.params && m.params.exceptionDetails) || {};
-        report.exceptions.push(
-          String((d.exception && (d.exception.description || d.exception.value)) || d.text || "unknown")
+        const text = String(
+          (d.exception && (d.exception.description || d.exception.value)) || d.text || "unknown"
         );
+        report.exceptions.push(text);
+        // Also mirror into the page so the env audit can surface it in one place.
+        mirrorToPage("__cdpProbeExceptions", text);
       } else if (m.method === "Runtime.consoleAPICalled") {
         if (m.params && m.params.type === "error") {
-          report.consoleErrors.push(
-            (m.params.args || [])
-              .map((a) => (a.value !== undefined ? a.value : a.description || a.type))
-              .join(" ")
-          );
+          const text = (m.params.args || [])
+            .map((a) => (a.value !== undefined ? a.value : a.description || a.type))
+            .join(" ");
+          report.consoleErrors.push(text);
+          mirrorToPage("__cdpProbeConsoleErrors", text);
         }
       } else if (m.method === "Log.entryAdded") {
         const e = (m.params && m.params.entry) || {};
-        if (e.level === "error") report.consoleErrors.push("log: " + e.text);
+        if (e.level === "error") {
+          const text = "log: " + e.text;
+          report.consoleErrors.push(text);
+          mirrorToPage("__cdpProbeConsoleErrors", text);
+        }
       }
     });
     await new Promise((r) => ws.addEventListener("open", r));
@@ -337,6 +372,10 @@ const AUDIT = `(function () {
     console.log("navigated (+" + (Date.now() - tn) + "ms, readyState=" + navState + ")");
 
     await sleep(WAIT);
+
+    // Flush buffered CDP-layer errors into the page before the env audit reads them.
+    mirrorReady = true;
+    for (const [bucket, text] of mirrorQueue) mirrorToPage(bucket, text);
 
     // ---- Environment capability audit ----
     if (process.env.NOAUDIT !== "1") {

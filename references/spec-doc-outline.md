@@ -107,6 +107,15 @@ Two blocks: a **per-approach checklist** + a **common checklist** (cross-approac
 
 A three-column table: item / explanation / recommendation. Write real engineering risks (performance, platform differences, fringing at small sizes); do not write filler like "there may not be enough time".
 
+**"Unknowns and Unverified Items" lives here** and is not optional when non-empty. Two distinct kinds, keep them separate:
+
+| Kind | What it looks like | What the entry must state |
+|---|---|---|
+| **Evidence gap** | The mechanism was not verified: no WebGL, login wall, anti-bot, server-side | What local verification was attempted, why it failed, and that the conclusion rests on source structure or public description |
+| **Deferred decision** | Something was decided by assumption rather than evidence | The assumption made, the cost if it is wrong |
+
+Any **decisive link** supported only by web research lands in the first row — never silently in the body. Citations live **next to the sentence they support**; do not collect them into a detached references section at the end, which is exactly how an unmarked claim slips through.
+
 ### Difference quick-reference
 
 Close with a comparison table, dimension × approach. Let the reader locate the row they need at a glance and follow the row name back to the corresponding chapter.

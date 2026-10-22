@@ -26,9 +26,20 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
+/** Print the header block only: strip the shebang, then the opening /** and the closing *. */
+function printUsage() {
+  const head = fs.readFileSync(__filename, "utf8").split("*/")[0];
+  console.log(
+    head
+      .replace(/^#![^\n]*\n/, "")
+      .replace(/^\/\*\*?[ \t]?/, "")
+      .replace(/^\n+/, "")
+  );
+}
+
 const argv = process.argv.slice(2);
 if (!argv.length || argv[0] === "-h" || argv[0] === "--help") {
-  console.log(fs.readFileSync(__filename, "utf8").split("*/")[0].replace(/^\/\*\*?/, ""));
+  printUsage();
   process.exit(argv.length ? 0 : 1);
 }
 
@@ -44,6 +55,8 @@ const DO_BEAUTIFY = has("--beautify");
 const BEAUTIFY_ALL = has("--all");
 const SHOW_API = !has("--no-api");
 const TOP = Number(opt("--top", 60));
+// --top 0 means "show nothing", not "fall back to the default"
+const LIMIT = Number.isFinite(TOP) && TOP >= 0 ? TOP : 60;
 const CUSTOM_KEYS = (opt("--keys", "") || "").split(",").map((s) => s.trim()).filter(Boolean);
 
 if (!fs.existsSync(input)) {
@@ -53,9 +66,23 @@ if (!fs.existsSync(input)) {
 const html = fs.readFileSync(input, "utf8");
 
 // ---------- 1. Split script tags ----------
+// Only executable JavaScript counts. Template blocks (<script type="text/x-handlebars-template">),
+// JSON data islands (<script type="application/json">), importmaps and speculation rules are HTML
+// content that happens to sit inside a <script> tag. Counting them would let markup text pollute the
+// frequency table, and that table is the basis of the "does it use X" judgement in Phase 1.
+const JS_TYPES = new Set([
+  "",
+  "text/javascript",
+  "application/javascript",
+  "text/ecmascript",
+  "application/ecmascript",
+  "module",
+]);
+
 const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
 const inline = [];
 const external = [];
+const nonJs = [];
 let m;
 while ((m = re.exec(html))) {
   const attrs = m[1] || "";
@@ -64,21 +91,36 @@ while ((m = re.exec(html))) {
   if (srcMatch) {
     external.push(srcMatch[2] || srcMatch[3] || srcMatch[4] || "");
   } else if (body.trim().length) {
-    const type = (attrs.match(/\btype\s*=\s*("([^"]*)"|'([^']*)')/i) || [])[2] || "text/javascript";
-    inline.push({ body, type, attrs: attrs.trim() });
+    const typeMatch = attrs.match(/\btype\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    const rawType = (typeMatch && (typeMatch[2] || typeMatch[3] || typeMatch[4])) || "";
+    const type = rawType.trim().toLowerCase();
+    if (JS_TYPES.has(type)) {
+      inline.push({ body, type: type || "text/javascript", attrs: attrs.trim() });
+    } else {
+      nonJs.push({ body, type, attrs: attrs.trim() });
+    }
   }
 }
 
 console.log("=".repeat(64));
 console.log(`Input: ${input}  (${(html.length / 1024).toFixed(1)} KB)`);
-console.log(`Inline scripts: ${inline.length} block(s)   External scripts: ${external.length}`);
+console.log(
+  `Inline scripts: ${inline.length} block(s)   External scripts: ${external.length}` +
+    (nonJs.length ? `   Non-JS <script> skipped: ${nonJs.length}` : "")
+);
 console.log("=".repeat(64));
 
 if (!inline.length) {
-  console.log("\nNo inline scripts. If the target is a bundled build, read the external .js files individually instead.");
+  console.log("\nNo executable inline scripts. If the target is a bundled build, read the external .js files individually instead.");
   if (external.length) {
     console.log("\nExternal script list:");
     external.forEach((s, i) => console.log(`  [${i + 1}] ${s}`));
+  }
+  if (nonJs.length) {
+    console.log("\nNon-JS <script> blocks present (template / data island — not excluded from analysis, just not counted):");
+    nonJs.forEach((s, i) =>
+      console.log(`  [${i + 1}] type=${s.type}  ${(s.body.length / 1024).toFixed(1)} KB`)
+    );
   }
   process.exit(0);
 }
@@ -248,9 +290,11 @@ if (SHOW_API) {
   console.log("=".repeat(64));
   let shown = 0;
   outer: for (const g of groups) {
+    if (shown >= LIMIT) break;
     console.log(`\n[${g.name}]  (${g.total} hits)`);
     for (const it of g.items) {
-      if (shown++ >= TOP) break outer;
+      if (shown >= LIMIT) break outer;
+      shown++;
       console.log(`  ${String(it.n).padStart(5)}  ${it.label}`);
     }
   }

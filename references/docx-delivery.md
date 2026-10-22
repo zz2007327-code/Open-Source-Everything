@@ -161,39 +161,66 @@ could have been solved in a 5-minute probe.
 
 ## 4. Stage 3 — Convert to .docx
 
-### 4.1 Prepare the Runtime Environment (Windows must-read pitfall)
+### 4.0 Preflight: never assume the converter environment exists
+
+**Run this check before writing any HTML.** The conversion venv is created lazily and is frequently empty — `~/.venv-html-to-docx/Scripts/python.exe` can exist while `html_to_docx` and its dependencies are not installed. Skipping this check means discovering the problem after the whole document is written.
+
+```bash
+# 1. Does the venv exist and can it import the converter?
+PY="$HOME/.venv-html-to-docx/Scripts/python.exe"
+[ -x "$PY" ] && "$PY" -c "import html_to_docx, click, docx, bs4, lxml; print('env OK')" \
+  || echo "env MISSING — run the install step below"
+```
+
+The install step — **locate the plugin directory by glob, never by a hard-coded version** (the cache path carries a build id such as `5.7.3-wb.40038958.…` that changes on every plugin update):
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+PLUGIN=$(ls -d "$HOME/.workbuddy/plugins/cache/workbuddy-builtin/tencent-docx"/*/ | sort -V | tail -1)
+echo "plugin: $PLUGIN"
+
+# Create the venv only if it is actually absent (do NOT delete and rebuild an existing one)
+[ -x "$PY" ] || uv venv "$HOME/.venv-html-to-docx"
+
+uv pip install --python "$PY" --only-binary=:all: \
+  -r "${PLUGIN}skills/html-to-docx/scripts/requirements.txt"
+
+# Re-check
+"$PY" -c "import html_to_docx, click, docx, bs4, lxml; print('env OK')"
+```
+
+Key points:
+
+- That venv is created by uv and **has no pip** — do not use `python -m pip` (it errors with `No module named pip`); you must use `uv pip`.
+- Always pass `--only-binary=:all:` to avoid lxml failing to build from source in an environment without libxml2/libxslt.
+- Do not create your own `.venv` under the skill's `scripts/`. The converter reads `html_to_docx` from the **plugin directory**, so the module itself must be imported with the plugin's `scripts/` dir on the path (see §4.2) — the venv only supplies third-party dependencies.
+- **If preflight cannot be made to pass**, do not improvise a converter. Fall back to Markdown per SKILL.md Phase 4: write the `.md` per `spec-doc-outline.md`, state honestly why no `.docx` was produced, and stop.
+
+### 4.1 Windows-specific pitfall in the bundled setup script
 
 `scripts/wb/local/setup-html-to-docx.sh` **has a platform-assumption bug**: it checks for `$VENV_DIR/bin/python`,
 but on Windows a uv-created venv has `Scripts/python.exe`, so it judges the environment invalid → `rm -rf` and rebuilds the venv
 → then `uv pip install` produces no output for a long time (observed to hang >10min).
 
-**Workaround** (installs 20 packages in about 15s):
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-uv pip install --python "$HOME/.venv-html-to-docx/Scripts/python.exe" \
-  --only-binary=:all: \
-  -r "<plugin_root>/skills/html-to-docx/scripts/requirements.txt"
-```
-
-Key points:
-
-- That venv was created by uv and **has no pip** — do not use `python -m pip` (it errors with `No module named pip`); you must use `uv pip`.
-- Do not create your own `.venv` under the skill's `scripts/`.
-- Always pass `--only-binary=:all:` to avoid lxml failing to build from source in an environment without libxml2/libxslt.
+**Workaround**: use the §4.0 install step instead of that script. It installs the 20 packages in about 15s and never deletes an existing venv.
 
 ### 4.2 Invoke the Conversion
 
+The module lives in the plugin, not in the venv — put the plugin scripts dir on `PYTHONPATH` and run from there:
+
 ```bash
-cd "<plugin_root>/skills/html-to-docx/scripts"
-"$HOME/.venv-html-to-docx/Scripts/python.exe" -m html_to_docx convert \
+PLUGIN=$(ls -d "$HOME/.workbuddy/plugins/cache/workbuddy-builtin/tencent-docx"/*/ | sort -V | tail -1)
+PY="$HOME/.venv-html-to-docx/Scripts/python.exe"
+SCRIPTS="${PLUGIN}skills/html-to-docx/scripts"
+
+cd "$SCRIPTS" && PYTHONPATH="$SCRIPTS" "$PY" -m html_to_docx convert \
   "<abs>/stage2/formatted-<theme>.html" \
   -o "<abs>/stage3/<document-name>.docx" \
   --page-size A4 --orientation portrait \
   --margin-top 2.5 --margin-bottom 2.0 --margin-left 2.5 --margin-right 2.5
 ```
 
-On success, stdout prints `{"success": true, "docx_path": ...}`.
+On success, stdout prints `{"success": true, "docx_path": ...}`. If you see `ModuleNotFoundError: No module named 'click'`, the §4.0 install step has not been run — go back, do not retry blindly.
 
 **`rgba()` backgrounds are unsupported**: the converter warns `Unsupported/keyword background 'rgba(...)'; ignored`,
 and that shading is discarded (border retained). Switching to hexadecimal soft colors yields zero warnings:
@@ -224,10 +251,22 @@ print('headings:', len([p for p in d.paragraphs if p.style.name.startswith('Head
 
 ### 4.4 Wrap-Up
 
-1. Write the `stage_3` block in `pipeline-state.yaml` (`status: completed`, `skill_used: ["html-to-docx"]`,
-   `present_files_opened: true`), and run a `consistency_check` (actually `stat` the files; do not guess from paths).
-2. **Immediately open the `.docx` preview via `present_files`** — this is a hard constraint; not opening the preview means S3 is not complete.
-3. If the document contains content changed in the HTML but not written back to the provenance record, complete `pipeline-state.yaml`.
+`pipeline-state.yaml` is a **delivery provenance record** this skill writes at the end of Phase 4, in the working directory. It exists so that a later run (or a reviewer) can tell which style chain produced the file and where the sources are — without it, a `.docx` with no paper trail is indistinguishable from a hand-made one. Keep it minimal:
+
+```yaml
+# write this only after stage 3 succeeds and the preview has been opened
+stages:
+  stage1: { status: completed, skill_used: ["doc-writer"], artifact: "stage1/final_draft.md" }
+  stage2: { status: completed, skill_used: ["html-template"], artifact: "stage2/formatted-business-modern.html" }
+  stage3: { status: completed, skill_used: ["html-to-docx"], artifact: "stage3/<name>.docx",
+            present_files_opened: true }
+```
+
+Then finish the delivery:
+
+1. Write the three stage blocks above, and run a **consistency check** by actually `stat`-ing each `artifact` path — never infer success from the path string.
+2. **Immediately open the `.docx` preview via `present_files`** — this is a hard constraint; not opening the preview means stage 3 is not complete.
+3. If the HTML was changed after the provenance record was written, update the record to match what is actually on disk.
 
 > When writing Windows absolute paths in YAML, mind the escaping: `"C:\\Users\\..."`.
 > Doing string replacement in Python easily turns `\\` into `////`; `grep` to recheck after replacing.

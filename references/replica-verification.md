@@ -157,7 +157,9 @@ When insufficient environment capability (no WebGL, target requires real hardwar
 
 When investigating a performance problem, do two things first:
 
-1. Read the exceptions (`env.exceptions` / `consoleErrors` / `bootErrs`; the probe already emits all three layers).
+1. Read the exceptions. The probe emits them at three layers, and `env` now mirrors all three so one read is enough:
+   `env.bootErrs` (JS hook, initialization-time) / `env.exceptions` (CDP `Runtime.exceptionThrown`) / `env.consoleErrors` + `env.cdpConsoleErrors`.
+   The authoritative copies also live at the top level of the JSON report (`report.exceptions` / `report.consoleErrors`).
    The overhead driven by exceptions is often an order of magnitude larger than the algorithm itself.
 2. While reading timings, confirm **which link level** the time goes to, rather than guessing.
 

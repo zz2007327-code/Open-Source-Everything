@@ -222,7 +222,7 @@ EVAL3="new Promise(r=>setTimeout(()=>r('after'), 700))" \
   node scripts/cdp_probe.js "<URL>"
 ```
 
-To **validate a timing model** (e.g. whether an easing curve matches expectations), sample continuously in-page with `requestAnimationFrame`, return the timestamped sample array in one go, and cross-check the numbers against the formula locally — see `references/replica-verification.md` §2 path 2.
+To **validate a timing model** (e.g. whether an easing curve matches expectations), sample continuously in-page with `requestAnimationFrame`, return the timestamped sample array in one go, and cross-check the numbers against the formula locally — see `references/replica-verification.md` §2, Path 2 (Numeric Cross-Check).
 
 ### 3.2 Controlled Experiments
 
