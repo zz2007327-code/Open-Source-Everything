@@ -62,11 +62,11 @@ X. 当作教科书：把这条链路讲清楚
 7. 未知与未验证项（诚实标注）
 ```
 
-> **媒介适配**：交付 .docx 时，「整体链路」用 **GFM 表格**呈现（阶段 / 处理 / 中间数据结构）；
-> 不要试图做图形化渲染。表格在转换链路里最稳，读者也能扫读。见 `docx-delivery.md`。
+> **媒介适配**：交付 HTML 时，「整体链路」用 **GFM 表格**（阶段 / 处理 / 中间数据结构）或内联 SVG 图示呈现；
+> 表格在长文档里最稳，读者也能扫读。图示只做静态结构图，不做动效。见 `html-delivery.md`。
 
-> **Medium adaptation**: when delivering .docx, present the "overall chain" as a **GFM table** (stage / processing / intermediate data structure);
-> do not attempt graphical rendering. Tables survive the conversion chain most reliably, and readers can scan them. See `docx-delivery.md`.
+> **Medium adaptation**: when delivering HTML, present the "overall chain" as a **GFM table** (stage / processing / intermediate data structure) or an inline SVG diagram;
+> tables are the most reliable carrier in a long document, and readers can scan them. Diagrams stay static structure only — no animation. See `html-delivery.md`.
 
 ### 写作纪律 · Writing Discipline
 

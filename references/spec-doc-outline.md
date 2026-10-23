@@ -14,7 +14,7 @@ Writing discipline: give numbers as concrete values plus an adjustable range; gi
 
 ```
 封面（可选，取决于交付媒介）
-摘要 / 执行摘要
+摘要 / 执行摘要                      ← 一个位置，一章
 1. 文档说明
     (1) 本文目的
     (2) 共用的底层链路（不变的部分）       ← 最有价值的一章
@@ -41,6 +41,30 @@ X.  使用建议（按用户意图写其中一部分）
       · 当作教科书（学习向，见 learning-track.md）
       · 当作蓝图（净室向，见 clean-room-design.md）
 ```
+
+**「摘要」只写一次。** 骨架里它是**一个位置**，不是两章：不要同时写「摘要」和「执行摘要」，也不要让同一句结论在文档里出现两遍。它承载三样东西——**结论**（这套机制的关键判断）、**关键指标**（实现前必须定死的几个数字）、**风险边界**（哪几处是假设而非证据）。排版链会把它映射成 `.executive-summary` 块，那是同一个位置的另一种呈现，不是第二个章节。
+
+**Write the summary once.** In this skeleton it is **one slot**, not two chapters: do not write both a "摘要" and an "执行摘要", and never let the same conclusion appear twice. It carries three things — **conclusions** (the key verdicts about the mechanism), **key metrics** (the numbers that must be fixed before implementation), and **risk boundary** (which parts are assumptions rather than evidence). The layout chain maps it into an `.executive-summary` block, which is the same slot rendered differently, not a second chapter.
+
+**章节数要在动笔前定下来。** 篇幅由**变更面**决定，不由目标的大小决定：
+
+| 用户要的 | 章节数 | 取舍 |
+|---|---|---|
+| 解析某个功能 / 搞懂这一块 | 8–11 章 | 机制链讲透，跳过与结论无关的模块 |
+| 整个目标拆成可施工规格 | 12–16 章 | 每模块一章，末尾加差异速查 |
+| 只要结论 / 只要能不能换做法 | 3–5 章 | 结论 + 证据 + 施工要点，不铺骨架 |
+
+**Fix the chapter count before drafting.** Length is set by the **change surface**, not by the size of the target:
+
+| What was asked | Chapters | Trade-off |
+|---|---|---|
+| Analyze one feature / understand this part | 8–11 | Explain the mechanism chain fully; skip modules irrelevant to the verdict |
+| Whole target as a buildable spec | 12–16 | One chapter per module, plus a difference quick reference at the end |
+| Just a verdict / can it be done differently | 3–5 | Verdict + evidence + build points; skip the full skeleton |
+
+超过上限说明**还没收敛**，回 Phase 2 重新判断哪几个环节是决定性的。硬撑章节不会增加信息，只会让变更面更难看清。
+
+Exceeding the cap means **you have not converged** — go back to Phase 2 and re-decide which links are decisive. Padding chapters adds no information; it only makes the change surface harder to see.
 
 ---
 
@@ -184,15 +208,15 @@ Close with a comparison table, dimensions × variants. Let the reader find the r
 
 | 媒介 | 适配要点 |
 |------|---------|
-| **.docx**（走 tencent-docx） | 用 GFM 表格 + 三/四级标题；代码用围栏代码块；结构见 `docx-delivery.md` |
-| **单文件 HTML**（技术分享） | 主链**不产出** HTML。用户明确要交互 demo 时，作为独立附加任务处理，不要混进规格文档 |
-| **Markdown** | 直接按上述结构写；表格用 GFM |
+| **单文件 HTML**（**默认**） | 结构完全按上面的骨架；用 `scripts/build_doc.py` 生成（内联 CSS、目录、锚点、`<thead>/<tbody>` 表格）；约束见 `html-delivery.md` |
+| **.docx**（按需附加） | 仅当用户明确要 Word 时：从同一份 Markdown 走 `docx-delivery.md` 的 tencent-docx 链，**不要**从 HTML 反推 |
+| **Markdown**（降级） | 直接按上述结构写；表格用 GFM。仅在 HTML 生成失败时使用，并如实说明原因 |
 
 | Medium | Adaptation points |
 |------|---------|
-| **.docx** (via tencent-docx) | Use GFM tables plus level-3/4 headings; use fenced code blocks for code; see `docx-delivery.md` for the structure |
-| **Single-file HTML** (tech sharing) | The main pipeline does **not produce** HTML. When the user explicitly wants an interactive demo, handle it as a separate add-on task, do not mix it into the spec document |
-| **Markdown** | Write directly in the structure above; use GFM for tables |
+| **Single-file HTML** (**default**) | Structure exactly as the skeleton above; generate with `scripts/build_doc.py` (inline CSS, contents, anchors, `<thead>/<tbody>` tables); constraints in `html-delivery.md` |
+| **.docx** (on-demand add-on) | Only when the user explicitly wants Word: run the tencent-docx chain in `docx-delivery.md` from the same Markdown, **never** back-convert the HTML |
+| **Markdown** (fallback) | Write directly in the structure above; use GFM for tables. Only when HTML generation fails, and say why honestly |
 
 无论哪种媒介，**内容结构完全一致**——媒介只影响排版，不影响章节骨架。
 
@@ -214,6 +238,9 @@ Go through it item by item before delivery:
 6. [ ] 所有长度参数都相对于字号，不是绝对像素。
 7. [ ] 风险项是工程风险，且都有对应的建议动作。
 8. [ ] 结尾有差异速查表。
+9. [ ] 章节数在动笔前定好，且不超过对应档位的上限。
+10. [ ] 「摘要」只有一处，同一句结论全文只出现一次。
+11. [ ] 用到的每个组件都确认过它能落进最终产物（HTML 里能正常渲染，不依赖外部资源）。
 
 1. [ ] The "unchanged part" and the "change surface" are both written out explicitly, and the change surface is reduced to the minimum.
 2. [ ] Every number is a concrete value or an expression; no "appropriate", "slightly", "about right".
@@ -223,3 +250,6 @@ Go through it item by item before delivery:
 6. [ ] All length parameters are relative to the font size, not absolute pixels.
 7. [ ] Risk items are engineering risks, and each has a corresponding recommended action.
 8. [ ] A difference quick-reference table closes the document.
+9. [ ] The chapter count was fixed before drafting and stays within its tier's cap.
+10. [ ] There is exactly one summary, and each conclusion appears exactly once.
+11. [ ] Every component used was confirmed to survive into the final artifact (renders correctly in HTML, with no external dependency).

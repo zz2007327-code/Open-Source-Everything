@@ -1,8 +1,16 @@
-# 文档交付：完整的 tencent-docx 交付链 · Document Delivery: The Complete tencent-docx Delivery Chain
+# 文档交付（可选附加）：tencent-docx 交付链 · Document Delivery (Optional Add-on): The tencent-docx Delivery Chain
 
-Phase 4 的执行手册。按本清单执行，可**一次通过质量闸门（quality gate）**，免去返工。
+> **这不是默认路径。** 本技能的默认交付物是单文件 HTML，见 `html-delivery.md`。
+> 只有当用户**明确要求 `.docx`**（要交给法务 / 要发邮件 / 要进 CI 文档库）时，才读本文件。
+> 从同一份 Markdown 源稿出发走这条链，**不要**从 HTML 反推——`.docx` 链每一步都会丢信息，反推只会把损失放大。
 
-The execution handbook for Phase 4. Follow this checklist to **pass the quality gate on the first attempt** and avoid rework.
+> **This is not the default path.** The default deliverable of this skill is a single-file HTML; see `html-delivery.md`.
+> Read this file only when the user **explicitly asks for `.docx`** (legal review, email delivery, a CI doc repository).
+> Run this chain from the same Markdown source, **never** back-convert the HTML — every step of the `.docx` chain loses information, and back-conversion amplifies the loss.
+
+Phase 4 的备选手册。按本清单执行，可**一次通过质量闸门（quality gate）**，免去返工。
+
+The alternative handbook for Phase 4. Follow this checklist to **pass the quality gate on the first attempt** and avoid rework.
 
 ---
 
@@ -20,11 +28,11 @@ and the delivery chain is fixed as **S1 writing → S2 layout → S3 convert to 
 Intermediate artifacts (`.md` / `.html`) **must not** be passed to `present_files`, and the body text must not be pasted into the reply either;
 deliver only the `.docx` produced by S3, and it **must be opened with `present_files` immediately**.
 
-> 注：若目标产物是"技术分享页"而非"规格文档"，可以跳过本链，直接产出单文件 HTML。
-> 本链针对的是**交付一份 Word 文档**的场景。
+> 注：本链的前两级（S1 写作、S2 排版）与默认 HTML 链**共用同一份 Markdown 源稿**。
+> 如果 Phase 3 已经写出了 `final_draft.md`，直接从 S2 开始，不要重写正文。
 
-> Note: if the target artifact is a "technical sharing page" rather than a "spec document", you may skip this chain and produce a single-file HTML directly.
-> This chain targets the **delivery of a Word document** scenario.
+> Note: the first two stages of this chain (S1 writing, S2 layout) **share the same Markdown source** as the default HTML chain.
+> If Phase 3 already produced `final_draft.md`, start at S2 — do not rewrite the body.
 
 ---
 
@@ -144,6 +152,7 @@ How to fix the common failures:
 | 用零宽空格 `&#8203;` 伪造非空段落 | 段落能保住，但**样式不落地**（样式应用以"有可见文字"为匹配条件） | 不要用不可见字符骗它；用真实文字 |
 | 段落级边框（内联 `style`） | 内联 `style` 与段落文字会**错配**（实测边框落到了上一个标题上） | 段落级边框**一律走类选择器**；类选择器落点准确 |
 | 用 `rgba()` 做底纹 | **不支持**；会告警 `Unsupported/keyword background 'rgba(...)'; ignored`，底纹被丢弃（边框保留） | 换成十六进制柔和色（§4.2 表） |
+| 组件（`data-component`）放进表格单元格 | **不清洗**：占位符回填只遍历 body 顶层段落，表格里的组件会以 `__SPECIAL_REGION__:xxx` 原文留在产物里 | 组件**一律独立成块**，放在表格外面 |
 
 | Desired layout | Actual converter behavior | Correct carrier |
 |--------------|---------------|---------|
@@ -153,6 +162,15 @@ How to fix the common failures:
 | Faking a non-empty paragraph with a zero-width space `&#8203;` | The paragraph survives, but the **style does not land** (style application matches on "has visible text") | Do not trick it with invisible characters; use real text |
 | Paragraph-level border (inline `style`) | Inline `style` and paragraph text get **mismatched** (measured: the border landed on the previous heading) | Paragraph-level borders **always go through class selectors**; class selectors land accurately |
 | Using `rgba()` for shading | **Unsupported**; it warns `Unsupported/keyword background 'rgba(...)'; ignored` and the shading is dropped (the border is kept) | Switch to a soft hex color (§4.2 table) |
+| A component (`data-component`) inside a table cell | **Not cleaned up**: placeholder filling only walks top-level body paragraphs, so a component inside a table stays in the artifact as literal `__SPECIAL_REGION__:xxx` | Components **always stand as their own block**, outside any table |
+
+**为什么组件不能进单元格**：`converter.py` 的 `_replace_placeholders` 遍历的是 `document.paragraphs` —— 这是 body 顶层的段落集合，**不含表格单元格内的段落**（那些要走 `table.rows[i].cells[j].paragraphs`）。所以单元格里的组件占位符找不到对应段落，原样留下。
+
+**Why a component cannot go inside a cell**: `_replace_placeholders` in `converter.py` walks `document.paragraphs` — the top-level body paragraph collection, which **excludes paragraphs inside table cells** (those require `table.rows[i].cells[j].paragraphs`). A component placeholder in a cell therefore finds no matching paragraph and is left as-is.
+
+如果确实想要"卡片放在表格里"的视觉，正确做法是**用单列表格卡片模拟**：底纹和边框加在 `<td>` 上，内容写成纯段落文字，不挂 `data-component`。
+
+If you genuinely want the "card inside a table" look, the correct approach is to **simulate it with a single-column table card**: shading and border on the `<td>`, content as plain paragraph text, no `data-component` attached.
 
 **带底纹卡片的标准写法**（底纹与边框都能落地）：
 
@@ -293,12 +311,12 @@ Key points:
 - 那个 venv 由 uv 创建，**没有 pip** —— 不要用 `python -m pip`（会报 `No module named pip`）；必须用 `uv pip`。
 - 始终传 `--only-binary=:all:`，避免 lxml 在没有 libxml2/libxslt 的环境里从源码构建失败。
 - 不要在 skill 的 `scripts/` 下自建 `.venv`。转换器从**插件目录**读取 `html_to_docx`，所以导入模块时必须把插件的 `scripts/` 目录放进路径（见 §4.2）—— venv 只供第三方依赖。
-- **如果预检怎么都过不了**，不要临时自己造一个转换器。按 SKILL.md Phase 4 降级（fallback）到 Markdown：按 `spec-doc-outline.md` 写出 `.md`，如实说明为什么没有产出 `.docx`，然后停止。
+- **如果预检怎么都过不了**，不要临时自己造一个转换器，也不要指望从 HTML 回退。按 §5 的降级说明处理：把 `.docx` 需求退回给用户，说明本机环境装不上转换链，并交付 Markdown / HTML 版本作为替代。
 
 - That venv is created by uv and **has no pip** — do not use `python -m pip` (it reports `No module named pip`); you must use `uv pip`.
 - Always pass `--only-binary=:all:` so lxml does not fail to build from source in environments without libxml2/libxslt.
 - Do not create your own `.venv` under the skill's `scripts/`. The converter reads `html_to_docx` from the **plugin directory**, so the plugin's `scripts/` directory must be on the path when importing the module (see §4.2) — the venv only serves third-party dependencies.
-- **If the precheck cannot be made to pass at all**, do not improvise a converter. Fall back to Markdown per SKILL.md Phase 4: write the `.md` according to `spec-doc-outline.md`, state honestly why no `.docx` was produced, then stop.
+- **If the precheck cannot be made to pass at all**, do not improvise a converter, and do not count on falling back from HTML. Handle it per §5: send the `.docx` request back to the user, explain that the conversion chain cannot be installed here, and deliver the Markdown / HTML version as the substitute.
 
 ### 4.1 内置安装脚本的 Windows 专有坑 · 4.1 Windows-Specific Pitfall in the Bundled Install Script
 
@@ -335,6 +353,18 @@ cd "$SCRIPTS" && PYTHONPATH="$SCRIPTS" "$PY" -m html_to_docx convert \
 成功时 stdout 打印 `{"success": true, "docx_path": ...}`。若看到 `ModuleNotFoundError: No module named 'click'`，说明 §4.0 的安装步骤没跑 —— 回去补，不要盲目重试。
 
 On success, stdout prints `{"success": true, "docx_path": ...}`. If you see `ModuleNotFoundError: No module named 'click'`, the install steps in §4.0 were not run — go back and do them, do not retry blindly.
+
+**页边距必须走 CLI 参数，不要写 `<meta name="docx-margin-*">`。** `page_setup.py` 的 `resolve_page_defaults` 按 `options > meta > 默认值` 取值，而 `business-report` 模板自带一套 options 默认值 —— 于是 HTML 里写的 `meta` 被模板默认值压住，产物回到 2.54 / 3.17 之类的不想要的值。**`--margin-*` 走的是 `options`，优先级最高**，写上就生效：
+
+**Margins must go through CLI arguments; do not write `<meta name="docx-margin-*">`.** `resolve_page_defaults` in `page_setup.py` resolves as `options > meta > defaults`, and the `business-report` template ships its own options defaults — so the `meta` written in HTML is overridden by the template defaults and the artifact comes back at unwanted values like 2.54 / 3.17. **`--margin-*` lands in `options`, the highest priority**, and takes effect as written:
+
+```bash
+--margin-top 2.5 --margin-bottom 2.0 --margin-left 2.5 --margin-right 2.5
+```
+
+生成后按 §4.3 回读 `section.top_margin.cm` 等四个值确认落地，不要假设参数已经生效。
+
+After generation, read back `section.top_margin.cm` and the other three per §4.3 to confirm they landed; do not assume the flags took effect.
 
 **不支持 `rgba()` 背景**：转换器会告警 `Unsupported/keyword background 'rgba(...)'; ignored`，
 该底纹被丢弃（边框保留）。换成十六进制柔和色后零告警：
@@ -375,6 +405,33 @@ print('headings:', len([p for p in d.paragraphs if p.style.name.startswith('Head
 
 `sections` should be 2 (cover + body), and the number of `tables` should match the number of `<table>` elements in the HTML.
 
+**再加两项必须为 0 的检查** —— 它们直接判"这份文档有没有带病出厂"：
+
+**Plus two checks that must return 0** — they decide whether the document shipped sick:
+
+```bash
+"$HOME/.venv-html-to-docx/Scripts/python.exe" -c "
+import docx, re
+d = docx.Document(r'<abs>/stage3/<document-name>.docx')
+txt = '\n'.join(p.text for p in d.paragraphs)
+# 1) 组件占位符残留：非 0 说明有组件放进了表格单元格（或没被识别）
+print('leftover placeholders:', len(re.findall(r'__[A-Z_]+__', txt)))
+# 2) 页边距落地：应与 CLI 参数一致
+s = d.sections[0]
+print('margins cm: %.2f %.2f %.2f %.2f' % (s.top_margin.cm, s.bottom_margin.cm, s.left_margin.cm, s.right_margin.cm))
+"
+```
+
+| 检查 | 期望值 | 非期望值意味着什么 |
+|---|---|---|
+| `leftover placeholders` | **0** | 有 `data-component` 落在了 `<td>` 里。按 §3.3 的"组件不能进单元格"改 HTML，重新转换 |
+| `margins cm` | 与 CLI 参数一致 | `meta` 被模板 options 压住了。按 §4.2 改用 `--margin-*` |
+
+| Check | Expected | What a bad value means |
+|---|---|---|
+| `leftover placeholders` | **0** | A `data-component` landed inside a `<td>`. Fix the HTML per §3.3's "components cannot enter a cell" and reconvert |
+| `margins cm` | Matches the CLI flags | `meta` was overridden by the template options. Switch to `--margin-*` per §4.2 |
+
 **结构正确不等于版式正确** —— 段落边框、单元格底纹、章节标题横线都必须按 §3.5 的表逐项对着 XML 回读。
 
 **Correct structure does not equal correct layout** — paragraph borders, cell shading, and chapter heading rules must all be read back against the XML item by item, following the table in §3.5.
@@ -411,3 +468,31 @@ Then complete the delivery:
 
 > Mind the escaping when writing Windows absolute paths in YAML: `"C:\\Users\\..."`.
 > String replacement in Python easily turns `\\` into `////`; re-check with `grep` after replacing.
+
+---
+
+## 5. 降级说明 · 5. Fallback
+
+这条链依赖一个真实的 Office 转换器（venv + 插件 + 平台差异），它的失败模式比默认 HTML 链多得多。**装不上就诚实说，不要硬造。**
+
+This chain depends on a real Office converter (venv + plugin + platform quirks), and its failure modes outnumber the default HTML chain's by a wide margin. **If it cannot be installed, say so honestly — never fake it.**
+
+退路按顺序试，一次只退一级：
+
+Try the fallbacks in order, one level at a time:
+
+| 级别 | 退到哪里 | 什么时候停 |
+|---|---|---|
+| 1 | 用 §4.0 的显式安装步骤重装一次（**不要**用内置 `setup-html-to-docx.sh`） | 装上了就继续跑 §4.2 |
+| 2 | 交付默认 HTML + 一份 Markdown 源稿，并说明 `.docx` 环境不可用 | 用户接受即可停 |
+| 3 | 只交 Markdown，按 `spec-doc-outline.md` 的结构 | 连 HTML 都写不出时（极少） |
+
+| Level | Fall back to | When to stop |
+|---|---|---|
+| 1 | Reinstall once with the explicit steps in §4.0 (**not** the bundled `setup-html-to-docx.sh`) | Once installed, continue at §4.2 |
+| 2 | Deliver the default HTML plus the Markdown source, stating that the `.docx` environment is unavailable | Stop once the user accepts |
+| 3 | Deliver Markdown only, per `spec-doc-outline.md` | When even HTML cannot be produced (rare) |
+
+**无论退到哪一级，都要说清三件事**：退到了哪一级、为什么、以及用户补上环境后能得到什么。含糊的"已尽最大努力"等于没交代。
+
+**Whichever level you land on, state three things**: which level, why, and what the user gains once the environment is available. A vague "did my best" is not an accounting.
